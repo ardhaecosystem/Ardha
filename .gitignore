@@ -1,0 +1,102 @@
+# ============================================
+# Ardha Project .gitignore
+# ============================================
+
+# ============================================
+# Shared Dependency Caches (NEVER COMMIT!)
+# ============================================
+.pnpm-store/
+.poetry-cache/
+
+# ============================================
+# Python / Backend
+# ============================================
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Poetry
+poetry.lock  # We'll commit this, but adding note
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ============================================
+# Node.js / Frontend
+# ============================================
+# Dependencies
+node_modules/
+
+# pnpm
+pnpm-lock.yaml  # We'll commit this, but adding note
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Testing
+coverage/
+
+# Misc
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================
+# Environment & Secrets
+# ============================================
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# ============================================
+# Database
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================
+# OS Files
+# ============================================
+.DS_Store
+Thumbs.db
+
+# ============================================
+# Temporary Files
+# ============================================
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
