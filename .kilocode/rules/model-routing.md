@@ -12,7 +12,7 @@
 - Code reviews requiring deep context understanding
 - API contract design and OpenAPI spec generation
 
-**Model**: `anthropic/claude-sonnet-4.5-20241022`
+**Model**: `anthropic/claude-sonnet-4.5`
 **Cost**: $3 input / $15 output per 1M tokens
 **Caching**: ✅ Enabled (90% discount on cached reads)
 **Capacity**: ~1.8M output tokens/month
@@ -221,7 +221,7 @@ If approaching $60/month limit (>90% spent):
 
 **Copy-paste ready:**
 ```
-anthropic/claude-sonnet-4.5-20241022    ← Claude Sonnet 4.5
+anthropic/claude-sonnet-4.5             ← Claude Sonnet 4.5
 z-ai/glm-4.6                            ← GLM 4.6
 x-ai/grok-code-fast-1                   ← Grok Code Fast 1
 google/gemini-2.0-flash-001:free        ← Gemini Flash (free tier)
