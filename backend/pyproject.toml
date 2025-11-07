@@ -5,6 +5,7 @@ description = "Ardha - AI-Native Project Management Platform Backend"
 authors = ["ardhaecosystem <ardhaecosystem@gmail.com>"]
 license = "MIT"
 readme = "README.md"
+packages = [{include = "ardha", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
