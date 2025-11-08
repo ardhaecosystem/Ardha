@@ -34,6 +34,7 @@
 - python-jose 3.3.0 - JWT token handling
 - passlib 1.7.4 - Password hashing
 - bcrypt (included with passlib)
+- email-validator 2.3.0 - Email validation for Pydantic EmailStr
 
 **Utilities:**
 - httpx 0.27.2 - Async HTTP client
@@ -201,15 +202,28 @@ ruff check .
 
 **Database Migrations:**
 ```bash
-# Create new migration
-alembic revision --autogenerate -m "description"
+# Create new migration (must set DATABASE__URL)
+DATABASE__URL="postgresql+asyncpg://ardha_user:ardha_password@localhost:5432/ardha_dev" \
+  alembic revision --autogenerate -m "description"
 
 # Apply migrations
-alembic upgrade head
+DATABASE__URL="postgresql+asyncpg://ardha_user:ardha_password@localhost:5432/ardha_dev" \
+  alembic upgrade head
 
 # Rollback one migration
-alembic downgrade -1
+DATABASE__URL="postgresql+asyncpg://ardha_user:ardha_password@localhost:5432/ardha_dev" \
+  alembic downgrade -1
+
+# Check current migration
+DATABASE__URL="postgresql+asyncpg://ardha_user:ardha_password@localhost:5432/ardha_dev" \
+  alembic current
+
+# View migration history
+DATABASE__URL="postgresql+asyncpg://ardha_user:ardha_password@localhost:5432/ardha_dev" \
+  alembic history
 ```
+
+**Note**: The `DATABASE__URL` environment variable uses double underscores (`__`) because Pydantic Settings maps nested config like `database.url` using `env_nested_delimiter="__"`.
 
 ### Frontend Development Setup
 
