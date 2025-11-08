@@ -20,6 +20,8 @@ from ardha.models.base import Base, BaseModel
 if TYPE_CHECKING:
     from ardha.models.project import Project
     from ardha.models.project_member import ProjectMember
+    from ardha.models.task import Task
+    from ardha.models.task_activity import TaskActivity
 
 
 class User(Base, BaseModel):
@@ -132,6 +134,26 @@ class User(Base, BaseModel):
         "ProjectMember",
         back_populates="user",
         foreign_keys="ProjectMember.user_id",
+        lazy="select"
+    )
+    
+    assigned_tasks: Mapped[list["Task"]] = relationship(
+        "Task",
+        back_populates="assignee",
+        foreign_keys="Task.assignee_id",
+        lazy="select"
+    )
+    
+    created_tasks: Mapped[list["Task"]] = relationship(
+        "Task",
+        back_populates="created_by",
+        foreign_keys="Task.created_by_id",
+        lazy="select"
+    )
+    
+    task_activities: Mapped[list["TaskActivity"]] = relationship(
+        "TaskActivity",
+        back_populates="user",
         lazy="select"
     )
     

@@ -16,6 +16,8 @@ from ardha.models.base import Base, BaseModel
 
 if TYPE_CHECKING:
     from ardha.models.project_member import ProjectMember
+    from ardha.models.task import Task
+    from ardha.models.task_tag import TaskTag
     from ardha.models.user import User
 
 
@@ -143,6 +145,20 @@ class Project(BaseModel, Base):
     
     members: Mapped[list["ProjectMember"]] = relationship(
         "ProjectMember",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
+    
+    tasks: Mapped[list["Task"]] = relationship(
+        "Task",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
+    
+    task_tags: Mapped[list["TaskTag"]] = relationship(
+        "TaskTag",
         back_populates="project",
         cascade="all, delete-orphan",
         lazy="select"

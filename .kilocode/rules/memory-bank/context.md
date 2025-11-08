@@ -7,6 +7,144 @@
 
 ## Recent Achievements
 
+### Session 5 - Complete Task Management System (November 8, 2025) ✅
+
+**Task Models (4 models, ~600 lines):**
+- ✅ Created [`backend/src/ardha/models/task.py`](../../../backend/src/ardha/models/task.py:1) (314 lines)
+  - 30+ fields: identifier, title, description, status, assignee, priority, complexity, phase, milestone, epic
+  - Time tracking: estimate_hours, actual_hours, started_at, completed_at, due_date
+  - OpenSpec integration: openspec_proposal_id, openspec_change_path
+  - AI metadata: ai_generated, ai_confidence, ai_reasoning
+  - Git linking: related_commits, related_prs, related_files (JSON arrays)
+  - Relationships: project, assignee, created_by, tags, dependencies, blocking, activities
+  - Constraints: Unique (project_id, identifier), 6 check constraints, 3 composite indexes
+
+- ✅ Created [`backend/src/ardha/models/task_dependency.py`](../../../backend/src/ardha/models/task_dependency.py:1) (95 lines)
+  - Self-referential many-to-many for task dependencies
+  - Fields: task_id, depends_on_task_id, dependency_type
+  - Relationships: task (dependent), depends_on_task (blocking)
+  - Unique constraint prevents duplicate dependencies
+
+- ✅ Created [`backend/src/ardha/models/task_tag.py`](../../../backend/src/ardha/models/task_tag.py:1) (92 lines)
+  - Project-scoped tags for flexible categorization
+  - Fields: name, color (hex), project_id
+  - Many-to-many relationship with tasks via task_task_tags association table
+  - Unique constraint: (project_id, name)
+
+- ✅ Created [`backend/src/ardha/models/task_activity.py`](../../../backend/src/ardha/models/task_activity.py:1) (119 lines)
+  - Comprehensive audit logging for all task changes
+  - Fields: task_id, user_id (nullable for AI), action, old_value, new_value, comment
+  - 16 predefined action types (created, status_changed, assigned, tag_added, etc.)
+  - User relationship for activity attribution
+
+**Task Repository (Data Access Layer):**
+- ✅ Created [`backend/src/ardha/repositories/task_repository.py`](../../../backend/src/ardha/repositories/task_repository.py:1) (837 lines)
+  - **CRUD Operations (9 methods):**
+    - get_by_id(), get_by_identifier(), get_project_tasks() with complex filtering
+    - create() with auto-identifier generation, update(), delete()
+    - update_status() with timestamp management, assign_user(), unassign_user()
+  - **Dependency Management (4 methods):**
+    - add_dependency(), remove_dependency(), get_dependencies(), get_blocking_tasks()
+  - **Tag Management (4 methods):**
+    - add_tag(), remove_tag(), get_task_tags(), get_or_create_tag()
+  - **Activity Logging (2 methods):**
+    - log_activity(), get_task_activities() with pagination
+  - **Querying & Filtering (3 methods):**
+    - count_by_status(), get_upcoming_tasks(), get_blocked_tasks()
+  - **Smart Features:**
+    - _generate_identifier() - Auto-generates TAS-001, TAS-002 from project slug
+    - Complex filtering: status, assignee, priority, tags, search, overdue
+    - Dynamic sorting: created_at, due_date, priority, status
+    - Eager loading with selectinload() for performance
+
+**Task Service (Business Logic):**
+- ✅ Created [`backend/src/ardha/services/task_service.py`](../../../backend/src/ardha/services/task_service.py:1) (887 lines)
+  - **Custom Exceptions:** TaskNotFoundError, CircularDependencyError, InvalidStatusTransitionError, InsufficientTaskPermissionsError
+  - **Status Transition Rules:** Validates transitions (todo → in_progress → in_review → done)
+  - **20+ Business Logic Methods:**
+    - create_task(), get_task(), get_project_tasks(), update_task(), delete_task()
+    - update_status() with validation, assign_task(), unassign_task()
+    - add_dependency() with circular detection, remove_dependency(), check_circular_dependency()
+    - add_tag_to_task(), remove_tag_from_task()
+    - link_openspec_proposal(), sync_task_from_openspec() (placeholder)
+    - link_git_commit() with auto-status update
+  - **Circular Dependency Detection:** BFS graph traversal to prevent cycles
+  - **Permission Checks:** All operations validate project member access
+  - **Activity Logging:** Automatic logging for all mutations
+
+**Task Schemas:**
+- ✅ Created [`backend/src/ardha/schemas/requests/task.py`](../../../backend/src/ardha/schemas/requests/task.py:1) (291 lines)
+  - TaskCreateRequest: Full validation (title, status, priority, complexity enums)
+  - TaskUpdateRequest: All fields optional for partial updates
+  - TaskFilterRequest: Rich query parameters (status, assignee, priority, tags, search, sort)
+  - TaskStatusUpdateRequest, TaskAssignRequest, TaskDependencyRequest, TaskTagRequest
+  - Field validators: Title whitespace check, tag name cleaning
+
+- ✅ Created [`backend/src/ardha/schemas/responses/task.py`](../../../backend/src/ardha/schemas/responses/task.py:1) (167 lines)
+  - TaskResponse: Complete task data with nested relationships
+  - TaskTagResponse, TaskDependencyResponse (with related task info), TaskActivityResponse
+  - TaskListResponse: Paginated with status_counts
+  - TaskBoardResponse: Grouped by status (Kanban view)
+  - TaskCalendarResponse, TaskTimelineResponse: Specialized views
+
+**Task API Routes:**
+- ✅ Created [`backend/src/ardha/api/v1/routes/tasks.py`](../../../backend/src/ardha/api/v1/routes/tasks.py:1) (868 lines)
+  - **18 REST Endpoints (all tested and working):**
+    - POST /api/v1/tasks/projects/{project_id}/tasks - Create (201)
+    - GET /api/v1/tasks/projects/{project_id}/tasks - List with filters (200)
+    - GET /api/v1/tasks/{task_id} - Get by ID (200, 403, 404)
+    - GET /api/v1/tasks/identifier/{project_id}/{identifier} - Get by identifier (200, 403, 404)
+    - PATCH /api/v1/tasks/{task_id} - Update (200, 403, 404)
+    - DELETE /api/v1/tasks/{task_id} - Delete (200, 403, 404)
+    - PATCH /api/v1/tasks/{task_id}/status - Update status (200, 400, 403, 404)
+    - POST /api/v1/tasks/{task_id}/assign - Assign (200, 403, 404)
+    - POST /api/v1/tasks/{task_id}/unassign - Unassign (200, 403, 404)
+    - POST /api/v1/tasks/{task_id}/dependencies - Add dependency (201, 400, 403, 404)
+    - DELETE /api/v1/tasks/{task_id}/dependencies/{depends_on_task_id} - Remove (200, 403, 404)
+    - GET /api/v1/tasks/{task_id}/dependencies - List (200, 403, 404)
+    - POST /api/v1/tasks/{task_id}/tags - Add tag (201, 403, 404)
+    - DELETE /api/v1/tasks/{task_id}/tags/{tag_id} - Remove (200, 403, 404)
+    - GET /api/v1/tasks/{task_id}/activities - Activity log (200, 403, 404)
+    - GET /api/v1/tasks/projects/{project_id}/tasks/board - Board view (200, 403)
+    - GET /api/v1/tasks/projects/{project_id}/tasks/calendar - Calendar view (200, 403)
+    - GET /api/v1/tasks/projects/{project_id}/tasks/timeline - Timeline view (200, 403)
+
+**Database Migration:**
+- ✅ Generated migration: `d843b8a8385a_add_task_models_with_dependencies_and_tags.py`
+- ✅ Applied successfully: Current migration is d843b8a8385a (head)
+- ✅ Tables created: tasks (30+ columns), task_tags, task_dependencies, task_activities, task_task_tags
+
+**Main App Integration:**
+- ✅ Updated [`backend/src/ardha/main.py`](../../../backend/src/ardha/main.py:1)
+  - Integrated tasks router with /api/v1 prefix
+  - All 18 task endpoints now accessible
+  - Total API endpoints: 35 (6 auth + 11 projects + 18 tasks)
+
+**Updated Models:**
+- ✅ Updated [`backend/src/ardha/models/project.py`](../../../backend/src/ardha/models/project.py:1)
+  - Added tasks and task_tags relationships
+- ✅ Updated [`backend/src/ardha/models/user.py`](../../../backend/src/ardha/models/user.py:1)
+  - Added assigned_tasks, created_tasks, task_activities relationships
+
+**Complete Task Management Validation (End-to-End Tests):**
+```
+✅ Task creation with auto-generated identifiers (TAS-001, TAS-002, TAS-003)
+✅ Tag auto-creation from task creation (backend, security, testing tags)
+✅ Status updates with transition validation (todo → in_progress)
+✅ Automatic timestamps (started_at when status → in_progress)
+✅ Task assignment with user info included
+✅ Get task by identifier (project_id + identifier string)
+✅ Dependency creation and listing with related task info
+✅ Unique constraint prevents duplicate dependencies
+✅ Activity logging for all changes (creation, status, tags, assignment)
+✅ Board view groups tasks by status with counts
+✅ All 18 endpoints registered in OpenAPI
+✅ Permission checks enforced (project member access required)
+✅ Lazy loading issues resolved with proper eager loading
+```
+
+##
+
 ### Session 4 - Complete Project Management System (November 8, 2025) ✅
 
 **Project & ProjectMember Models:**
@@ -212,11 +350,16 @@
 
 **Database Validation:**
 ```
-Current Migration: fa93e28de77f (head)
+Current Migration: d843b8a8385a (head)
 Users table: ✅ Created with 13 columns
 Projects table: ✅ Created with 13 columns
 Project Members table: ✅ Created with 7 columns
-Indexes: ✅ All unique and foreign key indexes created
+Tasks table: ✅ Created with 30+ columns (9 indexes, 6 check constraints)
+Task Tags table: ✅ Created with project-scoped tags
+Task Dependencies table: ✅ Created with self-referential relationships
+Task Activities table: ✅ Created for audit logging
+Task-Tag Association table: ✅ Created for many-to-many
+Indexes: ✅ All unique, foreign key, and composite indexes created
 ```
 
 ### Session 1 - Infrastructure Setup (November 1, 2025) ✅
@@ -251,7 +394,7 @@ Indexes: ✅ All unique and foreign key indexes created
 ## Current Work Focus
 
 ### Phase 1 - Backend Foundation (In Progress)
-**Status**: Week 1 COMPLETE! Authentication + Project Management ✅
+**Status**: Week 1 COMPLETE! Authentication + Project Management + Task Management ✅
 
 **Completed:**
 - ✅ SQLAlchemy 2.0 async engine and session factory
@@ -270,20 +413,26 @@ Indexes: ✅ All unique and foreign key indexes created
 - ✅ Authentication API routes (6 endpoints)
 - ✅ Project API routes (11 endpoints)
 - ✅ Password hashing with bcrypt (cost factor 12)
-- ✅ FastAPI integration (auth + projects routers)
-- ✅ End-to-end testing of all 17 endpoints
+- ✅ FastAPI integration (auth + projects + tasks routers)
+- ✅ Task Management system (complete)
+  - ✅ Task, TaskDependency, TaskTag, TaskActivity models (4 models)
+  - ✅ Task Repository (28 methods - CRUD, dependencies, tags, activities)
+  - ✅ Task Service (20+ methods - business logic, permissions, validation)
+  - ✅ API Routes (18 endpoints - CRUD, status, assignments, dependencies, tags, views)
+  - ✅ End-to-end testing validated
+- ✅ End-to-end testing of all 35 endpoints (6 auth + 11 projects + 18 tasks)
 
 **Next Immediate Steps (Week 2):**
-1. Write comprehensive tests for authentication and project systems
-   - Unit tests for UserRepository and ProjectRepository
-   - Unit tests for AuthService and ProjectService
+1. Write comprehensive tests for authentication, project, and task systems
+   - Unit tests for UserRepository, ProjectRepository, TaskRepository
+   - Unit tests for AuthService, ProjectService, TaskService
    - Integration tests for all API endpoints
    - Test fixtures in tests/conftest.py
 2. Implement GitHub OAuth flow
 3. Implement Google OAuth flow
 4. Add email verification system
 5. Implement password reset functionality
-6. Begin Task model design
+6. Begin Milestone model design (for task organization)
 
 ## Recent Decisions & Patterns
 
@@ -390,19 +539,26 @@ Ardha/
 ### Database Layer (Complete)
 - [`backend/src/ardha/core/database.py`](../../../backend/src/ardha/core/database.py:1) - Engine, sessions, dependencies
 - [`backend/src/ardha/models/base.py`](../../../backend/src/ardha/models/base.py:1) - Base classes and mixins
-- [`backend/src/ardha/models/user.py`](../../../backend/src/ardha/models/user.py:1) - User model with project relationships
-- [`backend/src/ardha/models/project.py`](../../../backend/src/ardha/models/project.py:1) - Project model
+- [`backend/src/ardha/models/user.py`](../../../backend/src/ardha/models/user.py:1) - User model with project and task relationships
+- [`backend/src/ardha/models/project.py`](../../../backend/src/ardha/models/project.py:1) - Project model with task relationships
 - [`backend/src/ardha/models/project_member.py`](../../../backend/src/ardha/models/project_member.py:1) - Project membership association
+- [`backend/src/ardha/models/task.py`](../../../backend/src/ardha/models/task.py:1) - Task model with 30+ fields
+- [`backend/src/ardha/models/task_dependency.py`](../../../backend/src/ardha/models/task_dependency.py:1) - Task dependencies (self-referential)
+- [`backend/src/ardha/models/task_tag.py`](../../../backend/src/ardha/models/task_tag.py:1) - Task tags
+- [`backend/src/ardha/models/task_activity.py`](../../../backend/src/ardha/models/task_activity.py:1) - Activity audit log
 - [`backend/src/ardha/db/base.py`](../../../backend/src/ardha/db/base.py:1) - Model imports for Alembic
 - [`backend/alembic/env.py`](../../../backend/alembic/env.py:1) - Alembic async configuration
 - [`backend/alembic/versions/b4e31b4c9224_initial_migration_users_table.py`](../../../backend/alembic/versions/b4e31b4c9224_initial_migration_users_table.py:1) - Users table migration
 - [`backend/alembic/versions/fa93e28de77f_add_project_and_project_member_tables.py`](../../../backend/alembic/versions/fa93e28de77f_add_project_and_project_member_tables.py:1) - Projects tables migration
+- [`backend/alembic/versions/d843b8a8385a_add_task_models_with_dependencies_and_tags.py`](../../../backend/alembic/versions/d843b8a8385a_add_task_models_with_dependencies_and_tags.py:1) - Task tables migration
 
 ### Schema Layer (Complete)
 - [`backend/src/ardha/schemas/requests/auth.py`](../../../backend/src/ardha/schemas/requests/auth.py:1) - Auth request validation
 - [`backend/src/ardha/schemas/requests/project.py`](../../../backend/src/ardha/schemas/requests/project.py:1) - Project request validation
+- [`backend/src/ardha/schemas/requests/task.py`](../../../backend/src/ardha/schemas/requests/task.py:1) - Task request validation
 - [`backend/src/ardha/schemas/responses/user.py`](../../../backend/src/ardha/schemas/responses/user.py:1) - User response formatting
 - [`backend/src/ardha/schemas/responses/project.py`](../../../backend/src/ardha/schemas/responses/project.py:1) - Project response formatting
+- [`backend/src/ardha/schemas/responses/task.py`](../../../backend/src/ardha/schemas/responses/task.py:1) - Task response formatting
 
 ### Authentication System (Complete)
 - [`backend/src/ardha/repositories/user_repository.py`](../../../backend/src/ardha/repositories/user_repository.py:1) - User data access
@@ -415,8 +571,13 @@ Ardha/
 - [`backend/src/ardha/services/project_service.py`](../../../backend/src/ardha/services/project_service.py:1) - Project business logic
 - [`backend/src/ardha/api/v1/routes/projects.py`](../../../backend/src/ardha/api/v1/routes/projects.py:1) - Project API endpoints
 
+### Task Management System (Complete)
+- [`backend/src/ardha/repositories/task_repository.py`](../../../backend/src/ardha/repositories/task_repository.py:1) - Task data access (28 methods)
+- [`backend/src/ardha/services/task_service.py`](../../../backend/src/ardha/services/task_service.py:1) - Task business logic (20+ methods)
+- [`backend/src/ardha/api/v1/routes/tasks.py`](../../../backend/src/ardha/api/v1/routes/tasks.py:1) - Task API endpoints (18 endpoints)
+
 ### Main Application
-- [`backend/src/ardha/main.py`](../../../backend/src/ardha/main.py:1) - FastAPI app with auth + projects routers
+- [`backend/src/ardha/main.py`](../../../backend/src/ardha/main.py:1) - FastAPI app with auth + projects + tasks routers
 
 ### Configuration Files
 - `backend/pyproject.toml` - Python dependencies and tool config
@@ -426,9 +587,8 @@ Ardha/
 - `backend/alembic.ini` - Alembic configuration
 
 ### Directories Ready for Next Implementation
-- `backend/tests/unit/` - Unit tests (next priority)
-- `backend/tests/integration/` - Integration tests (next priority)
-- `backend/src/ardha/api/v1/routes/` - Additional API routes (projects, tasks)
+- `backend/tests/unit/` - Unit tests (next priority - Week 2)
+- `backend/tests/integration/` - Integration tests (next priority - Week 2)
 - `frontend/src/` - Frontend code (Phase 5)
 
 ## Known Issues & Limitations
@@ -440,50 +600,45 @@ Ardha/
 - Configured Alembic for async SQLAlchemy operations
 
 ### Current Status
-- ✅ Database foundation complete (SQLAlchemy, User + Project + ProjectMember models, migrations)
+- ✅ Database foundation complete (SQLAlchemy, all models, migrations)
 - ✅ Complete authentication system (repository, service, security, routes)
 - ✅ Complete project management system (repository, service, routes)
+- ✅ Complete task management system (repository, service, routes, 4 models)
 - ✅ Docker containers running (postgres, redis, qdrant, backend, frontend)
-- ✅ 3 database tables created: users, projects, project_members
+- ✅ 8 database tables created: users, projects, project_members, tasks, task_tags, task_dependencies, task_activities, task_task_tags
 - ✅ JWT authentication working (access + refresh tokens)
-- ✅ 17 API endpoints functional and tested (6 auth + 11 projects)
-- ✅ Role-based permissions enforced
+- ✅ 35 API endpoints functional and tested (6 auth + 11 projects + 18 tasks)
+- ✅ Role-based permissions enforced across all endpoints
+- ✅ Identifier auto-generation working (TAS-001, TAS-002, etc.)
+- ✅ Activity logging working for all task mutations
 - ⏳ No tests written yet (next priority)
 - ⏳ No CI/CD pipeline configured
 - ⏳ No frontend implementation yet
 
 ## Next Steps (Detailed)
 
-### Immediate (Next Session)
-**Week 1 Completion: Authentication System**
-1. Implement User Repository (`repositories/user_repository.py`)
-   - `get_by_email()`, `get_by_username()`, `get_by_id()`
-   - `create()`, `update()`, `delete()`
-   - OAuth lookup methods
-   
-2. Implement Authentication Service (`services/auth_service.py`)
-   - User registration with password hashing
-   - Email/password authentication
-   - JWT token generation and validation
-   - Token refresh logic
-   - Password reset functionality
-   
-3. Implement Security Utilities (`core/security.py`)
-   - Password hashing with bcrypt (cost 12)
-   - JWT token encoding/decoding
-   - OAuth token validation
-   
-4. Create Auth API Routes (`api/v1/routes/auth.py`)
-   - `POST /api/v1/auth/register`
-   - `POST /api/v1/auth/login`
-   - `POST /api/v1/auth/refresh`
-   - `POST /api/v1/auth/logout`
-   - `POST /api/v1/auth/password-reset`
-   
-5. ✅ Write comprehensive tests (moved to Week 2)
+### Immediate (Next Session - Week 2)
+**Testing & OAuth Implementation:**
+1. Write comprehensive tests for all systems
+   - Unit tests for repositories (User, Project, Task)
+   - Unit tests for services (Auth, Project, Task)
+   - Integration tests for all 35 API endpoints
+   - Test fixtures for users, projects, tasks
+   - Coverage target: 90% for business logic, 100% for endpoints
+
+2. Implement OAuth flows
+   - GitHub OAuth integration
+   - Google OAuth integration
+   - OAuth callback handlers
+   - Link OAuth accounts to existing users
+
+3. Implement password reset
+   - Email verification tokens
+   - Password reset endpoints
+   - Email sending infrastructure (optional for MVP)
 
 ### Phase 1 - Backend Foundation (Weeks 1-3)
-**Week 1: Infrastructure & Auth & Projects** - COMPLETE ✅
+**Week 1: Infrastructure & Auth & Projects & Tasks** - COMPLETE ✅
 - ✅ Database foundation (SQLAlchemy, migrations)
 - ✅ User model and schemas + project relationships
 - ✅ Project & ProjectMember models with associations
@@ -498,8 +653,13 @@ Ardha/
   - ✅ Project Service (business logic + permissions)
   - ✅ API Routes (11 endpoints)
   - ✅ End-to-end testing validated
-- ⏳ Comprehensive tests (moved to Week 2)
-- ⏳ Logging improvements (ongoing)
+- ✅ Task management system (complete)
+  - ✅ Task, TaskDependency, TaskTag, TaskActivity models
+  - ✅ Task Repository (28 methods)
+  - ✅ Task Service (20+ methods with circular dependency detection)
+  - ✅ API Routes (18 endpoints including Board/Calendar/Timeline views)
+  - ✅ End-to-end testing validated
+- ⏳ Comprehensive unit and integration tests (moved to Week 2)
 
 **Week 2: OAuth & User Management**
 - Implement GitHub OAuth flow
@@ -508,12 +668,12 @@ Ardha/
 - Avatar upload functionality
 - Email verification system
 
-**Week 3: Core Project & Task Models**
-- Design project and task database schema
-- Create SQLAlchemy models (Project, Task, ProjectMember, TaskDependency)
-- Generate Alembic migrations
-- Implement project CRUD endpoints
-- Implement task CRUD endpoints
+**Week 3: Milestones, Files, and Git Integration**
+- Milestone model for organizing tasks into sprints/releases
+- File model for project file management
+- Git service for repository operations
+- GitHub API integration for PR/commit linking
+- WebSocket infrastructure for real-time updates
 
 ## Important Environment Configuration
 
