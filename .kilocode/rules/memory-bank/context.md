@@ -7,6 +7,117 @@
 
 ## Recent Achievements
 
+### Session 6 - Complete Milestone Management System (November 8, 2025) ✅
+
+**Milestone Model:**
+- ✅ Created [`backend/src/ardha/models/milestone.py`](../../../backend/src/ardha/models/milestone.py:1) (197 lines)
+  - 11 fields: project_id, name, description, status, color, progress_percentage, start_date, due_date, completed_at, order
+  - Status enum: not_started, in_progress, completed, cancelled
+  - Color field for UI customization (hex codes)
+  - Progress tracking: 0-100% calculated from task completion
+  - Relationships: project (many-to-one), tasks (one-to-many)
+  - Computed properties: is_overdue, days_remaining
+  - Indexes: project_id, status, due_date, (project_id + order composite)
+  - Check constraints: status enum, progress 0-100, color hex format, order >= 0
+
+**Milestone Repository (Data Access Layer):**
+- ✅ Created [`backend/src/ardha/repositories/milestone_repository.py`](../../../backend/src/ardha/repositories/milestone_repository.py:1) (584 lines)
+  - **CRUD Operations (10 methods):**
+    - get_by_id(), get_project_milestones(), get_by_status()
+    - create() with auto-order assignment, update(), delete()
+    - update_status() with completed_at timestamp management
+    - update_progress(), reorder() with collision handling
+  - **Task-Related Queries (4 methods):**
+    - get_milestone_tasks(), count_milestone_tasks()
+    - calculate_progress() - Formula: (completed_tasks / total_tasks) * 100
+    - get_milestones_with_task_counts()
+  - **Analytics Queries (2 methods):**
+    - get_upcoming_milestones() - Due within N days
+    - get_overdue_milestones() - Past due date, not completed/cancelled
+  - **Smart Features:**
+    - Auto-order assignment prevents conflicts
+    - Session flush before MAX query for accurate order calculation
+    - Reordering logic shifts other milestones automatically
+
+**Milestone Service (Business Logic):**
+- ✅ Created [`backend/src/ardha/services/milestone_service.py`](../../../backend/src/ardha/services/milestone_service.py:1) (604 lines)
+  - **Custom Exceptions:** MilestoneNotFoundError, MilestoneHasTasksError, InvalidMilestoneStatusError, InsufficientMilestonePermissionsError
+  - **Status Transition Rules:** Validates transitions between not_started, in_progress, completed, cancelled
+  - **14 Business Logic Methods:**
+    - create_milestone(), get_milestone(), get_project_milestones(), update_milestone(), delete_milestone()
+    - update_status() with transition validation, update_progress(), recalculate_progress()
+    - reorder_milestone() for drag-drop UI
+    - get_milestone_summary(), get_project_roadmap(), get_upcoming_milestones()
+  - **Delete Protection:** Prevents deleting milestone with linked tasks
+  - **Permission Checks:** All operations validate project member access
+  - **Progress Management:** Both manual and auto-calculated progress
+
+**Milestone Schemas:**
+- ✅ Created [`backend/src/ardha/schemas/requests/milestone.py`](../../../backend/src/ardha/schemas/requests/milestone.py:1) (95 lines)
+  - MilestoneCreateRequest: Name validation, status/color patterns, date validation
+  - MilestoneUpdateRequest: All fields optional for partial updates
+  - MilestoneStatusUpdateRequest, MilestoneProgressUpdateRequest, MilestoneReorderRequest
+  - Field validators: Name whitespace check, due_date after start_date
+
+- ✅ Created [`backend/src/ardha/schemas/responses/milestone.py`](../../../backend/src/ardha/schemas/responses/milestone.py:1) (54 lines)
+  - MilestoneResponse: Complete milestone data with computed fields
+  - MilestoneSummaryResponse: Statistics (task_stats, total_tasks, completed_tasks, auto_progress)
+  - MilestoneListResponse: Paginated with total count
+
+**Milestone API Routes:**
+- ✅ Created [`backend/src/ardha/api/v1/routes/milestones.py`](../../../backend/src/ardha/api/v1/routes/milestones.py:1) (782 lines)
+  - **12 REST Endpoints (all tested and working):**
+    - POST /api/v1/milestones/projects/{project_id}/milestones - Create (201)
+    - GET /api/v1/milestones/projects/{project_id}/milestones - List with filters (200)
+    - GET /api/v1/milestones/{milestone_id} - Get by ID (200, 403, 404)
+    - PATCH /api/v1/milestones/{milestone_id} - Update (200, 403, 404)
+    - DELETE /api/v1/milestones/{milestone_id} - Delete (200, 400, 403, 404)
+    - PATCH /api/v1/milestones/{milestone_id}/status - Update status (200, 400, 403, 404)
+    - PATCH /api/v1/milestones/{milestone_id}/progress - Manual progress (200, 403, 404)
+    - POST /api/v1/milestones/{milestone_id}/recalculate - Auto-calculate (200, 404)
+    - PATCH /api/v1/milestones/{milestone_id}/reorder - Change order (200, 403, 404)
+    - GET /api/v1/milestones/{milestone_id}/summary - Summary with stats (200, 403, 404)
+    - GET /api/v1/milestones/projects/{project_id}/milestones/roadmap - Roadmap view (200, 403)
+    - GET /api/v1/milestones/projects/{project_id}/milestones/upcoming - Upcoming (200, 403)
+
+**Database Migrations:**
+- ✅ Generated migrations:
+  - `9ee261875120_add_milestones_table.py` - Initial table creation
+  - `04c06991cf98_remove_default_from_milestone_order_.py` - Remove order default
+  - `3fbba54b25d7_remove_unique_constraint_from_milestone_.py` - Allow flexible ordering
+- ✅ Applied successfully: Current migration is 3fbba54b25d7 (head)
+- ✅ Table created: milestones (11 columns, 4 check constraints, 3 indexes)
+
+**Model Integrations:**
+- ✅ Updated [`backend/src/ardha/models/__init__.py`](../../../backend/src/ardha/models/__init__.py:1) - Exported Milestone
+- ✅ Updated [`backend/src/ardha/db/base.py`](../../../backend/src/ardha/db/base.py:1) - Imported for Alembic auto-discovery
+- ✅ Updated [`backend/src/ardha/main.py`](../../../backend/src/ardha/main.py:1) - Integrated milestones router
+- ✅ Updated [`backend/src/ardha/models/project.py`](../../../backend/src/ardha/models/project.py:1) - Added milestones relationship
+- ✅ Updated [`backend/src/ardha/models/task.py`](../../../backend/src/ardha/models/task.py:1) - Added milestone relationship with ForeignKey
+
+**Complete Milestone Management Validation (End-to-End Tests):**
+```
+✅ Create milestone with auto-order generation (no conflicts)
+✅ List milestones with pagination and status filtering
+✅ Get milestone by ID with computed fields (is_overdue, days_remaining)
+✅ Update milestone fields (description, progress, dates, etc.)
+✅ Status transitions with validation (not_started → in_progress → completed)
+✅ Automatic completed_at timestamps (set when → completed, cleared when leaving)
+✅ Manual progress updates (0-100%)
+✅ Auto-calculate progress from task completion (66% = 2 done / 3 total)
+✅ Reorder milestones for drag-drop UI (handles order collision)
+✅ Milestone summary with task statistics by status
+✅ Roadmap view for timeline visualization (all milestones ordered)
+✅ Upcoming milestones filter (due within N days)
+✅ Delete protection (prevents deleting with linked tasks)
+✅ Delete milestone without tasks (successful)
+✅ All 12 endpoints registered in OpenAPI
+✅ Permission checks enforced (project member access required)
+✅ Computed properties working (is_overdue, days_remaining)
+```
+
+##
+
 ### Session 5 - Complete Task Management System (November 8, 2025) ✅
 
 **Task Models (4 models, ~600 lines):**
@@ -350,10 +461,11 @@
 
 **Database Validation:**
 ```
-Current Migration: d843b8a8385a (head)
+Current Migration: 3fbba54b25d7 (head)
 Users table: ✅ Created with 13 columns
 Projects table: ✅ Created with 13 columns
 Project Members table: ✅ Created with 7 columns
+Milestones table: ✅ Created with 11 columns (4 check constraints, 3 indexes)
 Tasks table: ✅ Created with 30+ columns (9 indexes, 6 check constraints)
 Task Tags table: ✅ Created with project-scoped tags
 Task Dependencies table: ✅ Created with self-referential relationships
@@ -540,9 +652,10 @@ Ardha/
 - [`backend/src/ardha/core/database.py`](../../../backend/src/ardha/core/database.py:1) - Engine, sessions, dependencies
 - [`backend/src/ardha/models/base.py`](../../../backend/src/ardha/models/base.py:1) - Base classes and mixins
 - [`backend/src/ardha/models/user.py`](../../../backend/src/ardha/models/user.py:1) - User model with project and task relationships
-- [`backend/src/ardha/models/project.py`](../../../backend/src/ardha/models/project.py:1) - Project model with task relationships
+- [`backend/src/ardha/models/project.py`](../../../backend/src/ardha/models/project.py:1) - Project model with milestones and tasks relationships
 - [`backend/src/ardha/models/project_member.py`](../../../backend/src/ardha/models/project_member.py:1) - Project membership association
-- [`backend/src/ardha/models/task.py`](../../../backend/src/ardha/models/task.py:1) - Task model with 30+ fields
+- [`backend/src/ardha/models/milestone.py`](../../../backend/src/ardha/models/milestone.py:1) - Milestone model with 11 fields
+- [`backend/src/ardha/models/task.py`](../../../backend/src/ardha/models/task.py:1) - Task model with 30+ fields and milestone relationship
 - [`backend/src/ardha/models/task_dependency.py`](../../../backend/src/ardha/models/task_dependency.py:1) - Task dependencies (self-referential)
 - [`backend/src/ardha/models/task_tag.py`](../../../backend/src/ardha/models/task_tag.py:1) - Task tags
 - [`backend/src/ardha/models/task_activity.py`](../../../backend/src/ardha/models/task_activity.py:1) - Activity audit log
@@ -556,9 +669,11 @@ Ardha/
 - [`backend/src/ardha/schemas/requests/auth.py`](../../../backend/src/ardha/schemas/requests/auth.py:1) - Auth request validation
 - [`backend/src/ardha/schemas/requests/project.py`](../../../backend/src/ardha/schemas/requests/project.py:1) - Project request validation
 - [`backend/src/ardha/schemas/requests/task.py`](../../../backend/src/ardha/schemas/requests/task.py:1) - Task request validation
+- [`backend/src/ardha/schemas/requests/milestone.py`](../../../backend/src/ardha/schemas/requests/milestone.py:1) - Milestone request validation
 - [`backend/src/ardha/schemas/responses/user.py`](../../../backend/src/ardha/schemas/responses/user.py:1) - User response formatting
 - [`backend/src/ardha/schemas/responses/project.py`](../../../backend/src/ardha/schemas/responses/project.py:1) - Project response formatting
 - [`backend/src/ardha/schemas/responses/task.py`](../../../backend/src/ardha/schemas/responses/task.py:1) - Task response formatting
+- [`backend/src/ardha/schemas/responses/milestone.py`](../../../backend/src/ardha/schemas/responses/milestone.py:1) - Milestone response formatting
 
 ### Authentication System (Complete)
 - [`backend/src/ardha/repositories/user_repository.py`](../../../backend/src/ardha/repositories/user_repository.py:1) - User data access
@@ -576,8 +691,13 @@ Ardha/
 - [`backend/src/ardha/services/task_service.py`](../../../backend/src/ardha/services/task_service.py:1) - Task business logic (20+ methods)
 - [`backend/src/ardha/api/v1/routes/tasks.py`](../../../backend/src/ardha/api/v1/routes/tasks.py:1) - Task API endpoints (18 endpoints)
 
+### Milestone Management System (Complete)
+- [`backend/src/ardha/repositories/milestone_repository.py`](../../../backend/src/ardha/repositories/milestone_repository.py:1) - Milestone data access (16 methods)
+- [`backend/src/ardha/services/milestone_service.py`](../../../backend/src/ardha/services/milestone_service.py:1) - Milestone business logic (14 methods)
+- [`backend/src/ardha/api/v1/routes/milestones.py`](../../../backend/src/ardha/api/v1/routes/milestones.py:1) - Milestone API endpoints (12 endpoints)
+
 ### Main Application
-- [`backend/src/ardha/main.py`](../../../backend/src/ardha/main.py:1) - FastAPI app with auth + projects + tasks routers
+- [`backend/src/ardha/main.py`](../../../backend/src/ardha/main.py:1) - FastAPI app with auth + projects + milestones + tasks routers
 
 ### Configuration Files
 - `backend/pyproject.toml` - Python dependencies and tool config
@@ -605,12 +725,14 @@ Ardha/
 - ✅ Complete project management system (repository, service, routes)
 - ✅ Complete task management system (repository, service, routes, 4 models)
 - ✅ Docker containers running (postgres, redis, qdrant, backend, frontend)
-- ✅ 8 database tables created: users, projects, project_members, tasks, task_tags, task_dependencies, task_activities, task_task_tags
+- ✅ 9 database tables created: users, projects, project_members, milestones, tasks, task_tags, task_dependencies, task_activities, task_task_tags
 - ✅ JWT authentication working (access + refresh tokens)
-- ✅ 35 API endpoints functional and tested (6 auth + 11 projects + 18 tasks)
+- ✅ 47 API endpoints functional and tested (6 auth + 11 projects + 12 milestones + 18 tasks)
 - ✅ Role-based permissions enforced across all endpoints
 - ✅ Identifier auto-generation working (TAS-001, TAS-002, etc.)
 - ✅ Activity logging working for all task mutations
+- ✅ Milestone management complete (roadmap planning, progress tracking)
+- ✅ Complete project hierarchy: Project → Milestones → Tasks
 - ⏳ No tests written yet (next priority)
 - ⏳ No CI/CD pipeline configured
 - ⏳ No frontend implementation yet
@@ -620,9 +742,9 @@ Ardha/
 ### Immediate (Next Session - Week 2)
 **Testing & OAuth Implementation:**
 1. Write comprehensive tests for all systems
-   - Unit tests for repositories (User, Project, Task)
-   - Unit tests for services (Auth, Project, Task)
-   - Integration tests for all 35 API endpoints
+   - Unit tests for repositories (User, Project, Milestone, Task)
+   - Unit tests for services (Auth, Project, Milestone, Task)
+   - Integration tests for all 47 API endpoints
    - Test fixtures for users, projects, tasks
    - Coverage target: 90% for business logic, 100% for endpoints
 
@@ -668,8 +790,8 @@ Ardha/
 - Avatar upload functionality
 - Email verification system
 
-**Week 3: Milestones, Files, and Git Integration**
-- Milestone model for organizing tasks into sprints/releases
+**Week 3: Files, Git Integration, and Background Jobs**
+- ✅ Milestone system complete (moved to Week 1)
 - File model for project file management
 - Git service for repository operations
 - GitHub API integration for PR/commit linking

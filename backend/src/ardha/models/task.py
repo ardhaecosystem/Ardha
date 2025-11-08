@@ -33,6 +33,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ardha.models.base import Base, BaseModel
 
 if TYPE_CHECKING:
+    from ardha.models.milestone import Milestone
     from ardha.models.project import Project
     from ardha.models.task_activity import TaskActivity
     from ardha.models.task_dependency import TaskDependency
@@ -122,7 +123,7 @@ class Task(Base, BaseModel):
     
     milestone_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
-        # Future: ForeignKey("milestones.id", ondelete="SET NULL"),
+        ForeignKey("milestones.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -291,6 +292,12 @@ class Task(Base, BaseModel):
         back_populates="task",
         cascade="all, delete-orphan",
         order_by="desc(TaskActivity.created_at)",
+    )
+    
+    # Many-to-one: Milestone relationship
+    milestone: Mapped["Milestone | None"] = relationship(
+        "Milestone",
+        back_populates="tasks",
     )
     
     # ============= Constraints =============
