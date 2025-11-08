@@ -9,13 +9,17 @@ This module defines the User model with support for:
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 from sqlalchemy import Boolean, DateTime, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ardha.models.base import Base, BaseModel
+
+if TYPE_CHECKING:
+    from ardha.models.project import Project
+    from ardha.models.project_member import ProjectMember
 
 
 class User(Base, BaseModel):
@@ -114,6 +118,21 @@ class User(Base, BaseModel):
         DateTime(timezone=True),
         nullable=True,
         comment="Timestamp of last successful login"
+    )
+    
+    # Relationships
+    owned_projects: Mapped[list["Project"]] = relationship(
+        "Project",
+        back_populates="owner",
+        foreign_keys="Project.owner_id",
+        lazy="select"
+    )
+    
+    project_memberships: Mapped[list["ProjectMember"]] = relationship(
+        "ProjectMember",
+        back_populates="user",
+        foreign_keys="ProjectMember.user_id",
+        lazy="select"
     )
     
     def __repr__(self) -> str:

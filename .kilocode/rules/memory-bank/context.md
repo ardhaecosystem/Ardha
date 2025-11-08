@@ -7,6 +7,107 @@
 
 ## Recent Achievements
 
+### Session 4 - Complete Project Management System (November 8, 2025) ✅
+
+**Project & ProjectMember Models:**
+- ✅ Created [`backend/src/ardha/models/project.py`](../../../backend/src/ardha/models/project.py:1) (164 lines)
+  - 13 fields: name, description, slug, owner_id, visibility, tech_stack, git_repo_url, git_branch, openspec_enabled, openspec_path, is_archived, archived_at, timestamps
+  - Relationships: owner (User), members (ProjectMember list)
+  - Indexes: name, slug (unique), owner_id, is_archived
+  - Cascade delete support
+
+- ✅ Created [`backend/src/ardha/models/project_member.py`](../../../backend/src/ardha/models/project_member.py:1) (107 lines)
+  - Association table for many-to-many user-project relationship
+  - Role-based permissions: owner, admin, member, viewer
+  - Unique constraint on (project_id, user_id)
+  - joined_at timestamp tracking
+
+**Project Repository (Data Access Layer):**
+- ✅ Created [`backend/src/ardha/repositories/project_repository.py`](../../../backend/src/ardha/repositories/project_repository.py:1) (594 lines)
+  - **CRUD Operations (8 methods):**
+    - get_by_id(), get_by_slug(), get_by_owner(), get_user_projects()
+    - create() with auto-slug generation, update(), archive(), delete()
+  - **Member Management (5 methods):**
+    - add_member(), remove_member(), update_member_role()
+    - get_project_members() with eager user loading, get_member_role()
+  - **Smart Features:**
+    - _generate_unique_slug() - Auto-appends random suffix if duplicate
+    - Eager loading with selectinload() to prevent lazy loading errors
+    - Owner protection (cannot remove owner)
+
+**Project Service (Business Logic):**
+- ✅ Created [`backend/src/ardha/services/project_service.py`](../../../backend/src/ardha/services/project_service.py:1) (491 lines)
+  - **Role Hierarchy System:** owner (4) > admin (3) > member (2) > viewer (1)
+  - **Custom Exceptions:** ProjectNotFoundError, InsufficientPermissionsError, ProjectSlugExistsError
+  - **11 Business Logic Methods:**
+    - create_project(), get_project(), get_project_by_slug(), get_user_projects()
+    - update_project(), archive_project(), delete_project()
+    - add_member(), remove_member(), update_member_role(), get_project_members()
+    - check_permission(), get_member_count()
+  - Permission checks enforce hierarchical access control
+
+**Project Schemas:**
+- ✅ Created [`backend/src/ardha/schemas/requests/project.py`](../../../backend/src/ardha/schemas/requests/project.py:1) (184 lines)
+  - ProjectCreateRequest: Name validation (no whitespace-only), visibility pattern, tech_stack cleaning
+  - ProjectUpdateRequest: All fields optional for partial updates
+  - ProjectMemberAddRequest, ProjectMemberUpdateRequest: Role validation (admin/member/viewer only)
+
+- ✅ Created [`backend/src/ardha/schemas/responses/project.py`](../../../backend/src/ardha/schemas/responses/project.py:1) (100 lines)
+  - ProjectResponse: Complete project data with computed member_count
+  - ProjectMemberResponse: Member data with user information
+  - ProjectListResponse: Paginated results with total count
+
+**Project API Routes:**
+- ✅ Created [`backend/src/ardha/api/v1/routes/projects.py`](../../../backend/src/ardha/api/v1/routes/projects.py:1) (689 lines)
+  - **11 REST Endpoints (all tested and working):**
+    - POST /api/v1/projects/ - Create (201)
+    - GET /api/v1/projects/ - List with pagination (200)
+    - GET /api/v1/projects/{id} - Get by ID (200, 403, 404)
+    - GET /api/v1/projects/slug/{slug} - Get by slug (200, 403, 404)
+    - PATCH /api/v1/projects/{id} - Update (200, 403, 404)
+    - POST /api/v1/projects/{id}/archive - Archive (200, 403, 404)
+    - DELETE /api/v1/projects/{id} - Delete (200, 403, 404)
+    - GET /api/v1/projects/{id}/members - List members (200, 403)
+    - POST /api/v1/projects/{id}/members - Add (201, 400, 403, 404)
+    - DELETE /api/v1/projects/{id}/members/{user_id} - Remove (200, 400, 403, 404)
+    - PATCH /api/v1/projects/{id}/members/{user_id} - Update role (200, 403, 404)
+
+**Database Migration:**
+- ✅ Generated migration: `fa93e28de77f_add_project_and_project_member_tables.py`
+- ✅ Applied successfully: Current migration is fa93e28de77f (head)
+- ✅ Tables created: projects (13 columns), project_members (7 columns)
+
+**Dependencies Added:**
+- ✅ Added python-slugify 8.0.4 to pyproject.toml
+- ✅ Updated poetry.lock and installed successfully
+
+**Main App Integration:**
+- ✅ Updated [`backend/src/ardha/main.py`](../../../backend/src/ardha/main.py:1)
+  - Integrated projects router with /api/v1 prefix
+  - All 11 project endpoints now accessible
+  - Total API endpoints: 13 (6 auth + 6 projects + health/root)
+
+**Updated User Model:**
+- ✅ Added relationships to [`backend/src/ardha/models/user.py`](../../../backend/src/ardha/models/user.py:1)
+  - owned_projects: Projects user created
+  - project_memberships: All project memberships
+
+**Complete Project Management Validation (End-to-End Tests):**
+```
+✅ Project CRUD: Create, Read (by ID & slug), Update, Archive, List
+✅ Slug generation: Auto-generates from name, handles duplicates with random suffix
+✅ Member management: Add, remove, update role, list with user data
+✅ Permission system: Hierarchical checks (owner > admin > member > viewer)
+✅ Data protection: Cannot remove owner, duplicate member prevention
+✅ Validation: Empty names rejected, pattern validation on visibility/role
+✅ Pagination: Working with total counts and skip/limit
+✅ Archive filtering: Excluded from default queries
+✅ Eager loading: User data loaded to prevent lazy loading errors
+✅ All 11 endpoints tested with real HTTP requests
+```
+
+##
+
 ### Session 3 - Complete Authentication System (November 8, 2025) ✅
 
 **User Repository (Data Access Layer):**
@@ -111,9 +212,11 @@
 
 **Database Validation:**
 ```
-Current Migration: b4e31b4c9224 (head)
+Current Migration: fa93e28de77f (head)
 Users table: ✅ Created with 13 columns
-Indexes: ✅ email, username, github_id, google_id (all unique)
+Projects table: ✅ Created with 13 columns
+Project Members table: ✅ Created with 7 columns
+Indexes: ✅ All unique and foreign key indexes created
 ```
 
 ### Session 1 - Infrastructure Setup (November 1, 2025) ✅
@@ -148,33 +251,39 @@ Indexes: ✅ email, username, github_id, google_id (all unique)
 ## Current Work Focus
 
 ### Phase 1 - Backend Foundation (In Progress)
-**Status**: Week 1 Authentication System COMPLETE! ✅
+**Status**: Week 1 COMPLETE! Authentication + Project Management ✅
 
 **Completed:**
 - ✅ SQLAlchemy 2.0 async engine and session factory
 - ✅ Base models with mixins (BaseModel, SoftDeleteMixin)
-- ✅ User model with OAuth support
+- ✅ User model with OAuth support + project relationships
+- ✅ Project & ProjectMember models (roles, permissions)
 - ✅ Authentication request/response schemas
+- ✅ Project request/response schemas
 - ✅ Alembic migration system configured
-- ✅ Initial migration applied (users table created)
-- ✅ User Repository (complete data access layer)
-- ✅ Authentication Service (complete business logic)
+- ✅ 2 migrations applied (users, projects, project_members tables)
+- ✅ User Repository (6 methods)
+- ✅ Project Repository (13 methods - CRUD + member management)
+- ✅ Authentication Service (registration, login, JWT)
+- ✅ Project Service (11 methods - CRUD, members, permissions)
 - ✅ JWT Security utilities (token generation/validation)
-- ✅ Authentication API routes (all 6 endpoints)
+- ✅ Authentication API routes (6 endpoints)
+- ✅ Project API routes (11 endpoints)
 - ✅ Password hashing with bcrypt (cost factor 12)
-- ✅ FastAPI integration (auth router registered)
+- ✅ FastAPI integration (auth + projects routers)
+- ✅ End-to-end testing of all 17 endpoints
 
 **Next Immediate Steps (Week 2):**
-1. Write comprehensive tests for authentication system
-   - Unit tests for UserRepository methods
-   - Unit tests for AuthService logic
-   - Integration tests for API endpoints
+1. Write comprehensive tests for authentication and project systems
+   - Unit tests for UserRepository and ProjectRepository
+   - Unit tests for AuthService and ProjectService
+   - Integration tests for all API endpoints
    - Test fixtures in tests/conftest.py
 2. Implement GitHub OAuth flow
 3. Implement Google OAuth flow
 4. Add email verification system
 5. Implement password reset functionality
-6. Add logging and error handling improvements
+6. Begin Task model design
 
 ## Recent Decisions & Patterns
 
@@ -184,6 +293,9 @@ Indexes: ✅ email, username, github_id, google_id (all unique)
 - Timezone-aware timestamps (created_at, updated_at)
 - Soft delete support via SoftDeleteMixin (optional per model)
 - Connection pooling: 20 connections max, no overflow (2GB PostgreSQL limit)
+- **Session Management:** Services use `flush()` not `commit()` - FastAPI manages session lifecycle
+- **Eager Loading:** Use `selectinload()` for relationships to prevent lazy loading errors in async context
+- **Relationship Pattern:** Load user data separately in API responses to avoid lazy loading issues
 
 ### Schema Validation
 - Pydantic v2 with `ConfigDict(from_attributes=True)` for ORM compatibility
@@ -278,21 +390,33 @@ Ardha/
 ### Database Layer (Complete)
 - [`backend/src/ardha/core/database.py`](../../../backend/src/ardha/core/database.py:1) - Engine, sessions, dependencies
 - [`backend/src/ardha/models/base.py`](../../../backend/src/ardha/models/base.py:1) - Base classes and mixins
-- [`backend/src/ardha/models/user.py`](../../../backend/src/ardha/models/user.py:1) - User model
+- [`backend/src/ardha/models/user.py`](../../../backend/src/ardha/models/user.py:1) - User model with project relationships
+- [`backend/src/ardha/models/project.py`](../../../backend/src/ardha/models/project.py:1) - Project model
+- [`backend/src/ardha/models/project_member.py`](../../../backend/src/ardha/models/project_member.py:1) - Project membership association
 - [`backend/src/ardha/db/base.py`](../../../backend/src/ardha/db/base.py:1) - Model imports for Alembic
 - [`backend/alembic/env.py`](../../../backend/alembic/env.py:1) - Alembic async configuration
 - [`backend/alembic/versions/b4e31b4c9224_initial_migration_users_table.py`](../../../backend/alembic/versions/b4e31b4c9224_initial_migration_users_table.py:1) - Users table migration
+- [`backend/alembic/versions/fa93e28de77f_add_project_and_project_member_tables.py`](../../../backend/alembic/versions/fa93e28de77f_add_project_and_project_member_tables.py:1) - Projects tables migration
 
 ### Schema Layer (Complete)
 - [`backend/src/ardha/schemas/requests/auth.py`](../../../backend/src/ardha/schemas/requests/auth.py:1) - Auth request validation
+- [`backend/src/ardha/schemas/requests/project.py`](../../../backend/src/ardha/schemas/requests/project.py:1) - Project request validation
 - [`backend/src/ardha/schemas/responses/user.py`](../../../backend/src/ardha/schemas/responses/user.py:1) - User response formatting
+- [`backend/src/ardha/schemas/responses/project.py`](../../../backend/src/ardha/schemas/responses/project.py:1) - Project response formatting
 
 ### Authentication System (Complete)
 - [`backend/src/ardha/repositories/user_repository.py`](../../../backend/src/ardha/repositories/user_repository.py:1) - User data access
 - [`backend/src/ardha/services/auth_service.py`](../../../backend/src/ardha/services/auth_service.py:1) - Authentication business logic
 - [`backend/src/ardha/core/security.py`](../../../backend/src/ardha/core/security.py:1) - JWT utilities and dependencies
 - [`backend/src/ardha/api/v1/routes/auth.py`](../../../backend/src/ardha/api/v1/routes/auth.py:1) - Authentication API endpoints
-- [`backend/src/ardha/main.py`](../../../backend/src/ardha/main.py:1) - FastAPI app with auth integration
+
+### Project Management System (Complete)
+- [`backend/src/ardha/repositories/project_repository.py`](../../../backend/src/ardha/repositories/project_repository.py:1) - Project data access
+- [`backend/src/ardha/services/project_service.py`](../../../backend/src/ardha/services/project_service.py:1) - Project business logic
+- [`backend/src/ardha/api/v1/routes/projects.py`](../../../backend/src/ardha/api/v1/routes/projects.py:1) - Project API endpoints
+
+### Main Application
+- [`backend/src/ardha/main.py`](../../../backend/src/ardha/main.py:1) - FastAPI app with auth + projects routers
 
 ### Configuration Files
 - `backend/pyproject.toml` - Python dependencies and tool config
@@ -316,12 +440,14 @@ Ardha/
 - Configured Alembic for async SQLAlchemy operations
 
 ### Current Status
-- ✅ Database foundation complete (SQLAlchemy, User model, migrations)
+- ✅ Database foundation complete (SQLAlchemy, User + Project + ProjectMember models, migrations)
 - ✅ Complete authentication system (repository, service, security, routes)
+- ✅ Complete project management system (repository, service, routes)
 - ✅ Docker containers running (postgres, redis, qdrant, backend, frontend)
-- ✅ Users table created and validated in PostgreSQL
+- ✅ 3 database tables created: users, projects, project_members
 - ✅ JWT authentication working (access + refresh tokens)
-- ✅ 6 authentication endpoints functional and documented
+- ✅ 17 API endpoints functional and tested (6 auth + 11 projects)
+- ✅ Role-based permissions enforced
 - ⏳ No tests written yet (next priority)
 - ⏳ No CI/CD pipeline configured
 - ⏳ No frontend implementation yet
@@ -357,15 +483,21 @@ Ardha/
 5. ✅ Write comprehensive tests (moved to Week 2)
 
 ### Phase 1 - Backend Foundation (Weeks 1-3)
-**Week 1: Infrastructure & Auth** - COMPLETE ✅
+**Week 1: Infrastructure & Auth & Projects** - COMPLETE ✅
 - ✅ Database foundation (SQLAlchemy, migrations)
-- ✅ User model and schemas
+- ✅ User model and schemas + project relationships
+- ✅ Project & ProjectMember models with associations
 - ✅ Authentication system (complete)
   - ✅ User Repository (data access)
   - ✅ Authentication Service (business logic)
   - ✅ JWT Security (token management)
   - ✅ API Routes (6 endpoints)
   - ✅ FastAPI integration
+- ✅ Project management system (complete)
+  - ✅ Project Repository (CRUD + member management)
+  - ✅ Project Service (business logic + permissions)
+  - ✅ API Routes (11 endpoints)
+  - ✅ End-to-end testing validated
 - ⏳ Comprehensive tests (moved to Week 2)
 - ⏳ Logging improvements (ongoing)
 

@@ -1,0 +1,159 @@
+"""
+Project model for the Ardha application.
+
+This module defines the Project model representing project workspaces in Ardha.
+Projects are the top-level organizational unit containing tasks, files, and team members.
+"""
+
+from datetime import datetime
+from typing import TYPE_CHECKING
+from uuid import UUID
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from ardha.models.base import Base, BaseModel
+
+if TYPE_CHECKING:
+    from ardha.models.project_member import ProjectMember
+    from ardha.models.user import User
+
+
+class Project(BaseModel, Base):
+    """
+    Project model representing a project workspace.
+    
+    Projects are the primary organizational unit in Ardha, containing tasks,
+    files, Git repositories, and team members with role-based permissions.
+    
+    Attributes:
+        name: Project display name (max 255 chars, indexed for search)
+        description: Optional detailed project description
+        slug: URL-safe unique identifier (auto-generated from name)
+        owner_id: UUID of the user who created the project
+        visibility: Access control level ('private', 'team', 'public')
+        tech_stack: JSON array of technology tags (e.g., ["Python", "React"])
+        git_repo_url: Optional Git repository URL
+        git_branch: Default Git branch name (default: 'main')
+        openspec_enabled: Whether OpenSpec is enabled for this project
+        openspec_path: Path to OpenSpec directory within project
+        is_archived: Whether project is archived (soft delete)
+        archived_at: Timestamp when project was archived
+        owner: Relationship to User who owns the project
+        members: Relationship to ProjectMember association records
+    """
+    
+    __tablename__ = "projects"
+    
+    # Core fields
+    name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        index=True,
+        comment="Project display name"
+    )
+    
+    description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Project description"
+    )
+    
+    slug: Mapped[str] = mapped_column(
+        String(255),
+        unique=True,
+        nullable=False,
+        index=True,
+        comment="URL-safe unique identifier"
+    )
+    
+    # Ownership
+    owner_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="UUID of the project owner"
+    )
+    
+    # Settings
+    visibility: Mapped[str] = mapped_column(
+        String(50),
+        default="private",
+        nullable=False,
+        comment="Access control level (private/team/public)"
+    )
+    
+    tech_stack: Mapped[list[str]] = mapped_column(
+        JSON,
+        default=list,
+        nullable=False,
+        comment="JSON array of technology tags"
+    )
+    
+    # Git integration
+    git_repo_url: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        comment="Git repository URL"
+    )
+    
+    git_branch: Mapped[str] = mapped_column(
+        String(255),
+        default="main",
+        nullable=False,
+        comment="Default Git branch name"
+    )
+    
+    # OpenSpec configuration
+    openspec_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False,
+        comment="Whether OpenSpec is enabled"
+    )
+    
+    openspec_path: Mapped[str] = mapped_column(
+        String(255),
+        default="openspec/",
+        nullable=False,
+        comment="Path to OpenSpec directory"
+    )
+    
+    # Archive
+    is_archived: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        index=True,
+        comment="Whether project is archived"
+    )
+    
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Timestamp when project was archived"
+    )
+    
+    # Relationships
+    owner: Mapped["User"] = relationship(
+        "User",
+        back_populates="owned_projects",
+        foreign_keys=[owner_id]
+    )
+    
+    members: Mapped[list["ProjectMember"]] = relationship(
+        "ProjectMember",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
+    
+    def __repr__(self) -> str:
+        """String representation for debugging."""
+        return (
+            f"<Project(id={self.id}, "
+            f"slug='{self.slug}', "
+            f"name='{self.name}', "
+            f"owner_id={self.owner_id}, "
+            f"is_archived={self.is_archived})>"
+        )

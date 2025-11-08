@@ -5,7 +5,7 @@ Main FastAPI application for Ardha backend.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from ardha.api.v1.routes import auth
+from ardha.api.v1.routes import auth, projects
 from ardha.core.config import settings
 
 
@@ -29,6 +29,7 @@ def create_app() -> FastAPI:
     
     # Include API routers
     app.include_router(auth.router, prefix="/api/v1")
+    app.include_router(projects.router, prefix="/api/v1")
     
     # Health check endpoint
     @app.get("/health")
