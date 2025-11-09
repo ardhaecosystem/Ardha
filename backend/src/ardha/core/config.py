@@ -116,6 +116,34 @@ class AISettings(BaseModel):
     openrouter_api_key: str = Field(
         description="OpenRouter API key for AI services"
     )
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1",
+        description="OpenRouter API base URL"
+    )
+    openrouter_timeout: int = Field(
+        default=300,
+        ge=1,
+        le=600,
+        description="OpenRouter request timeout in seconds"
+    )
+    openrouter_max_retries: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Maximum retry attempts for OpenRouter requests"
+    )
+    openrouter_circuit_breaker_threshold: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Number of failures before circuit breaker opens"
+    )
+    openrouter_circuit_breaker_cooldown: int = Field(
+        default=300,
+        ge=60,
+        le=1800,
+        description="Circuit breaker cooldown period in seconds"
+    )
 
 
 class EmailSettings(BaseModel):
