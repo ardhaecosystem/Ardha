@@ -20,6 +20,8 @@ if TYPE_CHECKING:
     from ardha.models.task import Task
     from ardha.models.task_tag import TaskTag
     from ardha.models.user import User
+    from ardha.models.chat import Chat
+    from ardha.models.ai_usage import AIUsage
 
 
 class Project(BaseModel, Base):
@@ -167,6 +169,20 @@ class Project(BaseModel, Base):
     
     milestones: Mapped[list["Milestone"]] = relationship(
         "Milestone",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
+    
+    chats: Mapped[list["Chat"]] = relationship(
+        "Chat",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
+    
+    ai_usage: Mapped[list["AIUsage"]] = relationship(
+        "AIUsage",
         back_populates="project",
         cascade="all, delete-orphan",
         lazy="select"

@@ -13,6 +13,9 @@ from ardha.models.task_activity import TaskActivity
 from ardha.models.task_dependency import TaskDependency
 from ardha.models.task_tag import TaskTag
 from ardha.models.user import User
+from ardha.models.chat import Chat
+from ardha.models.message import Message
+from ardha.models.ai_usage import AIUsage
 
 __all__ = [
     "Base",
@@ -26,4 +29,7 @@ __all__ = [
     "TaskDependency",
     "TaskTag",
     "TaskActivity",
+    "Chat",
+    "Message",
+    "AIUsage",
 ]
