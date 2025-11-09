@@ -10,39 +10,34 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 
-class ChatCreateRequest(BaseModel):
+from typing import Literal
+
+class CreateChatRequest(BaseModel):
     """Request model for creating a new chat."""
     
-    mode: str = Field(
-        description="Chat mode (research, architect, implement, debug, chat)",
-        pattern="^(research|architect|implement|debug|chat)$"
+    mode: Literal["research", "architect", "implement", "debug", "chat"] = Field(
+        description="Chat mode (research, architect, implement, debug, chat)"
     )
     project_id: Optional[UUID] = Field(
         default=None,
         description="Optional project ID to associate chat with"
     )
-    
-    @field_validator("mode")
-    @classmethod
-    def validate_mode(cls, v: str) -> str:
-        """Validate chat mode is supported."""
-        valid_modes = ["research", "architect", "implement", "debug", "chat"]
-        if v not in valid_modes:
-            raise ValueError(f"Invalid mode: {v}. Must be one of: {valid_modes}")
-        return v
 
 
-class MessageSendRequest(BaseModel):
+class SendMessageRequest(BaseModel):
     """Request model for sending a message to chat."""
     
     content: str = Field(
+        ...,
         min_length=1,
-        max_length=10000,
+        max_length=50000,
         description="Message content to send"
     )
     model: str = Field(
-        description="AI model to use for response",
-        pattern="^[a-zA-Z0-9_/-]+$"
+        ...,
+        min_length=1,
+        max_length=100,
+        description="AI model to use for response"
     )
     
     @field_validator("content")
@@ -52,13 +47,8 @@ class MessageSendRequest(BaseModel):
         if not v or not v.strip():
             raise ValueError("Message content cannot be empty")
         return v.strip()
-    
-    @field_validator("model")
-    @classmethod
-    def validate_model(cls, v: str) -> str:
-        """Validate model is supported."""
-        from ..ai.models import get_model
-        model = get_model(v)
-        if not model:
-            raise ValueError(f"Unsupported model: {v}")
-        return v
+
+
+# Keep backward compatibility
+ChatCreateRequest = CreateChatRequest
+MessageSendRequest = SendMessageRequest

@@ -15,9 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ardha.core.database import get_db
 from ardha.core.security import get_current_user
+from ardha.core.rate_limit import check_chat_rate_limit
 from ardha.models.user import User
 from ardha.models.chat import ChatMode
-from ardha.schemas.requests.chat import ChatCreateRequest, MessageSendRequest
+from ardha.schemas.requests.chat import CreateChatRequest, MessageSendRequest
 from ardha.schemas.responses.chat import ChatResponse, ChatSummaryResponse, MessageResponse
 from ardha.services.chat_service import (
     ChatService,
@@ -34,7 +35,7 @@ router = APIRouter(prefix="/chats", tags=["chats"])
 
 @router.post("/", response_model=ChatResponse)
 async def create_chat(
-    request: ChatCreateRequest,
+    request: CreateChatRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ChatResponse:
@@ -94,6 +95,7 @@ async def send_message(
     request: MessageSendRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_chat_rate_limit),
 ) -> StreamingResponse:
     """
     Send a message and stream AI response.
@@ -358,4 +360,55 @@ async def archive_chat(
         raise HTTPException(status_code=403 if isinstance(e, InsufficientChatPermissionsError) else 404, detail=str(e))
     except Exception as e:
         logger.error(f"Error archiving chat: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.delete("/{chat_id}")
+async def delete_chat(
+    chat_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    Delete a chat (hard delete).
+    
+    Permanently removes chat and all associated messages.
+    Use archive_chat() for soft delete to preserve data.
+    
+    Args:
+        chat_id: UUID of chat to delete
+        current_user: Authenticated user making request
+        db: Database session
+        
+    Returns:
+        204 No Content on successful deletion
+        
+    Raises:
+        403: Insufficient permissions
+        404: Chat not found
+        500: Database error
+    """
+    logger.info(f"Deleting chat {chat_id} for user {current_user.id}")
+    
+    try:
+        chat_service = ChatService(db)
+        
+        # Verify ownership first
+        chat = await chat_service.chat_repo.get_by_id(chat_id)
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
+        
+        if chat.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        
+        # Delete the chat (cascade will delete messages)
+        await chat_service.chat_repo.delete(chat_id)
+        
+        return None
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting chat: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")

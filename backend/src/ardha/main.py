@@ -4,8 +4,9 @@ Main FastAPI application for Ardha backend.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-from ardha.api.v1.routes import auth, chats, milestones, oauth, projects, tasks
+from ardha.api.v1.routes import auth, chats, milestones, oauth, projects, tasks, websocket
 from ardha.core.config import settings
 
 
@@ -27,6 +28,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     
+    # Add trusted host middleware for WebSocket support
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=["localhost", "127.0.0.1", "*"]
+    )
+    
     # Include API routers
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(oauth.router, prefix="/api/v1")
@@ -34,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(milestones.router, prefix="/api/v1/milestones")
     app.include_router(tasks.router, prefix="/api/v1")
     app.include_router(chats.router, prefix="/api/v1")
+    app.include_router(websocket.router, prefix="/api/v1")
     
     # Health check endpoint
     @app.get("/health")
