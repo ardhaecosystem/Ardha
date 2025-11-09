@@ -649,17 +649,19 @@ async def add_task_dependency(
         await db.commit()
         await db.refresh(dependency)
         
-        # Build response with task info
+        # Build response with task info (fetch task separately to avoid lazy loading)
+        depends_on_task = await service.repository.get_by_id(dependency.depends_on_task_id)
+        
         response_data = {
             "id": dependency.id,
             "task_id": dependency.task_id,
             "depends_on_task_id": dependency.depends_on_task_id,
         }
         
-        if dependency.depends_on_task:
-            response_data["depends_on_task_identifier"] = dependency.depends_on_task.identifier
-            response_data["depends_on_task_title"] = dependency.depends_on_task.title
-            response_data["depends_on_task_status"] = dependency.depends_on_task.status
+        if depends_on_task:
+            response_data["depends_on_task_identifier"] = depends_on_task.identifier
+            response_data["depends_on_task_title"] = depends_on_task.title
+            response_data["depends_on_task_status"] = depends_on_task.status
         
         return TaskDependencyResponse(**response_data)
         

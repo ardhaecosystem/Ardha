@@ -283,3 +283,111 @@ class AuthService:
         )
         
         logger.debug(f"Updated last login for user {user_id}")
+    
+    async def oauth_login_or_create(
+        self,
+        provider: str,
+        oauth_id: str,
+        email: str,
+        username: str,
+        full_name: str | None,
+        avatar_url: str | None,
+    ) -> User:
+        """
+        Handle OAuth login or registration.
+        
+        Flow:
+        1. Check if user exists by OAuth ID (provider-specific)
+        2. If exists: Update last login and return user
+        3. If not exists: Check if email already registered
+        4. If email exists: Link OAuth account to existing user
+        5. If email doesn't exist: Create new user with OAuth data
+        
+        Args:
+            provider: OAuth provider name ('github' or 'google')
+            oauth_id: OAuth user ID from provider
+            email: User's email from OAuth provider
+            username: Username from OAuth provider
+            full_name: Full name from OAuth provider (optional)
+            avatar_url: Avatar URL from OAuth provider (optional)
+            
+        Returns:
+            User object (existing or newly created)
+            
+        Raises:
+            ValueError: If provider is invalid
+            
+        Example:
+            >>> user = await auth_service.oauth_login_or_create(
+            ...     provider="github",
+            ...     oauth_id="12345",
+            ...     email="user@example.com",
+            ...     username="githubuser",
+            ...     full_name="John Doe",
+            ...     avatar_url="https://avatars.githubusercontent.com/..."
+            ... )
+        """
+        # Validate provider
+        if provider not in ("github", "google"):
+            raise ValueError(f"Invalid OAuth provider: {provider}")
+        
+        # Check if user exists by OAuth ID
+        user = await self.user_repository.get_by_oauth_id(provider, oauth_id)
+        
+        if user:
+            # Existing OAuth user - update last login
+            await self.update_last_login(user.id)
+            logger.info(f"OAuth login successful for existing user: {email} ({provider})")
+            return user
+        
+        # Check if email already exists (account linking scenario)
+        existing_user = await self.user_repository.get_by_email(email)
+        
+        if existing_user:
+            # Link OAuth account to existing user
+            update_data = {}
+            
+            if provider == "github":
+                update_data["github_id"] = oauth_id
+            else:  # google
+                update_data["google_id"] = oauth_id
+            
+            # Update avatar if user doesn't have one
+            if not existing_user.avatar_url and avatar_url:
+                update_data["avatar_url"] = avatar_url
+            
+            updated_user = await self.user_repository.update(existing_user.id, **update_data)
+            if updated_user:
+                await self.update_last_login(updated_user.id)
+                logger.info(
+                    f"Linked {provider} account to existing user: {email} (ID: {updated_user.id})"
+                )
+                return updated_user
+        
+        # Create new user with OAuth data
+        # Generate unique username if needed
+        base_username = username
+        counter = 1
+        while await self.user_repository.get_by_username(username):
+            username = f"{base_username}{counter}"
+            counter += 1
+        
+        user_data = {
+            "email": email,
+            "username": username,
+            "full_name": full_name,
+            "avatar_url": avatar_url,
+            "is_active": True,
+            "is_superuser": False,
+            "password_hash": None,  # No password for OAuth-only users
+        }
+        
+        if provider == "github":
+            user_data["github_id"] = oauth_id
+        else:  # google
+            user_data["google_id"] = oauth_id
+        
+        user = await self.user_repository.create(user_data)
+        logger.info(f"Created new user via {provider} OAuth: {email} (ID: {user.id})")
+        
+        return user
