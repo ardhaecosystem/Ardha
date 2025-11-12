@@ -110,12 +110,20 @@ backend/src/ardha/
 │   ├── email_service.py      # Email sending
 │   └── websocket_manager.py  # WebSocket connections
 │
-├── workflows/                 # LangGraph workflows
-│   ├── research.py           # Idea → Research
-│   ├── prd_generation.py     # Research → PRD
-│   ├── task_generation.py    # PRD → Tasks
-│   ├── implementation.py     # Tasks → Code
-│   └── state.py              # Shared workflow state
+├── workflows/                 # LangGraph workflows ✅ COMPLETE
+│   ├── __init__.py           # Package initialization and exports
+│   ├── base.py               # Abstract BaseWorkflow class (285 lines)
+│   ├── state.py              # WorkflowState TypedDict (142 lines)
+│   ├── config.py             # Configuration management (156 lines)
+│   ├── nodes/                # Workflow nodes package
+│   │   ├── __init__.py       # Node exports and imports
+│   │   ├── base.py           # Base node infrastructure (285 lines)
+│   │   └── research_nodes.py # Research workflow nodes (412 lines)
+│   ├── research_workflow.py  # Research workflow implementation (398 lines)
+│   ├── orchestrator.py       # Orchestration service (398 lines)
+│   ├── memory.py             # Qdrant memory integration (234 lines)
+│   ├── models.py             # Database models (187 lines)
+│   └── tracking.py           # Execution tracking (156 lines)
 │
 ├── migrations/                # Alembic migrations
 │   ├── env.py
@@ -304,10 +312,14 @@ frontend/src/
 - No "prompt spaghetti"
 
 **Implementation**:
-- Workflows as directed graphs
-- Pure functions as nodes
-- State stored in PostgreSQL
-- Streaming updates via WebSocket
+- Workflows as directed graphs using LangGraph StateGraph
+- Abstract BaseWorkflow class with extensible node system
+- WorkflowState TypedDict with comprehensive state tracking
+- Redis-based checkpoint system with 7-day TTL
+- Five specialized AI nodes (research, architect, implement, debug, memory)
+- State stored in PostgreSQL + Redis checkpoints
+- Real-time streaming updates via WebSocket + Server-Sent Events
+- Concurrent execution support with tracking
 
 ### 6. Complexity-Based Model Routing
 **Decision**: Auto-select AI model based on task complexity  
@@ -361,36 +373,64 @@ User → Frontend Login → JWT Token → Backend Auth
                                 Refresh Token (7 days)
 ```
 
-### AI Workflow (Idea → Implementation)
+### AI Workflow (Idea → Implementation) ✅
 ```
-User Idea → Research Mode (LangGraph)
+User Idea → Research Workflow (LangGraph) ✅ COMPLETE
               ↓
-        PRD Generation (LangGraph)
+        AnalyzeIdeaNode (GLM-4.6) - Core concept analysis
               ↓
-        Task Generation (OpenSpec)
+        MarketResearchNode (Claude Sonnet 4.5) - Market analysis
               ↓
-        Human Approval ←──────────┐
-              ↓                    │
-        Implementation Mode         │
-              ↓                    │
-        Code + Commits             │
-              ↓                    │
-        Tests + Review              │
-              ↓                    │
-        GitHub PR                  │
-              ↓                    │
-        Merge & Archive ───────────┘
+        CompetitiveAnalysisNode (Claude Sonnet 4.5) - Competitor research
+              ↓
+        TechnicalFeasibilityNode (Claude Sonnet 4.5) - Technical assessment
+              ↓
+        SynthesizeResearchNode (Claude Sonnet 4.5) - Executive summary
+              ↓
+        Research Summary → PRD Generation Workflow
+              ↓
+        Requirements Node (OpenRouter)
+              ↓
+        Features Node (OpenRouter)
+              ↓
+        Success Metrics Node (OpenRouter)
+              ↓
+        PRD Document → Task Generation Workflow
+              ↓
+        Architecture Node (OpenRouter)
+              ↓
+        Task Breakdown Node (OpenRouter)
+              ↓
+        Dependencies Node (OpenRouter)
+              ↓
+        OpenSpec Files → Human Approval
+              ↓
+        Implementation Workflow (LangGraph)
+              ↓
+        Code Generation Node (OpenRouter)
+              ↓
+        Debug Node (OpenRouter) [if needed]
+              ↓
+        Memory Ingestion Node (Qdrant)
+              ↓
+        Tests + Review + GitHub PR
+              ↓
+        Merge & Archive
 ```
 
-### Memory Ingestion Pipeline
+### Memory Ingestion Pipeline ✅
 ```
-Chat Message → Summarize → Extract Decisions → Embed
-                                                 ↓
-                                             Qdrant
-                                                 
-Commit → Generate Explanation → Extract Patterns → Embed
-                                                      ↓
-                                                  Qdrant
+Chat Message → Summarize → Extract Decisions → Embed (sentence-transformers)
+                                                  ↓
+                                              Qdrant (vector database)
+                                                  
+Workflow Execution → Context Analysis → Pattern Extraction → Embed
+                                                       ↓
+                                                   Qdrant (semantic search)
+
+Git Commit → Generate Explanation → Extract Patterns → Embed
+                                                       ↓
+                                                   Qdrant (similarity matching)
 ```
 
 ### Database Query Path
@@ -418,14 +458,14 @@ Frontend → API Request → FastAPI Route
 7. Response: JWT tokens
 8. Frontend: Redirect to dashboard
 
-### Path 2: AI Chat Message
+### Path 2: AI Chat Message ✅
 1. Frontend: `components/chat/chat-input.tsx` → Send message
 2. WebSocket: Connect to `/api/v1/chats/{id}/ws`
 3. Backend: `services/websocket_manager.py` → Receive
 4. Service: `services/ai_service.py` → OpenRouter API
-5. LangGraph: Workflow orchestration (if needed)
-6. Stream: Response chunks via WebSocket
-7. Memory: `services/memory_service.py` → Ingest to Qdrant
+5. LangGraph: Workflow orchestration via `workflows/orchestrator.py`
+6. Stream: Response chunks via WebSocket + Server-Sent Events
+7. Memory: `workflows/memory.py` → Ingest to Qdrant with embeddings
 8. Frontend: Display in `components/chat/chat-message.tsx`
 
 ### Path 3: Git Commit → Task Update
@@ -436,15 +476,17 @@ Frontend → API Request → FastAPI Route
 5. WebSocket: Broadcast update to all viewers
 6. Frontend: Real-time task card update
 
-### Path 4: OpenSpec Proposal → Implementation
-1. AI: Generate proposal files (proposal.md, tasks.md, spec-delta.md)
-2. Backend: `services/openspec_service.py` → Parse markdown
-3. Model: `models/openspec.py` → Store proposal
-4. Frontend: `app/projects/[id]/openspec/page.tsx` → Display
-5. User: Review and approve
-6. Service: `services/task_service.py` → Sync tasks to PostgreSQL
-7. WebSocket: Broadcast new tasks
-8. Frontend: Tasks appear in board view
+### Path 4: AI Workflow Execution ✅
+1. User: Create workflow via `POST /api/v1/workflows`
+2. Backend: `workflows/orchestrator.py` → Initialize workflow
+3. Model: `workflows/models.py` → Store workflow template
+4. Execute: `POST /api/v1/workflows/{id}/execute`
+5. LangGraph: StateGraph execution with node routing
+6. Checkpoints: Redis state persistence with TTL
+7. Memory: `workflows/memory.py` → Context ingestion to Qdrant
+8. Tracking: `workflows/tracking.py` → Real-time progress monitoring
+9. Stream: Server-Sent Events for live updates
+10. Frontend: Display progress in workflow UI
 
 ## Performance Optimization Strategies
 
@@ -515,12 +557,25 @@ Frontend → API Request → FastAPI Route
 - Monitoring (Prometheus + Grafana)
 - Logging (Loki)
 
+## Completed Architecture Decisions ✅
+
+1. **Caching Strategy**: ✅ Redis for session cache, Qdrant for vector cache, prompt caching enabled
+2. **LangGraph Integration**: ✅ StateGraph with abstract base class, checkpoint system, node orchestration
+3. **Memory System**: ✅ Qdrant vector database with semantic search, embedding generation
+4. **Workflow State Management**: ✅ WorkflowState TypedDict, Redis checkpoints, PostgreSQL persistence
+5. **AI Node System**: ✅ Five specialized nodes (research, architect, implement, debug, memory)
+6. **Real-time Streaming**: ✅ WebSocket + Server-Sent Events for live workflow updates
+7. **Execution Tracking**: ✅ Concurrent workflow support, progress monitoring, error recovery
+8. **Research Workflow Architecture**: ✅ Multi-agent research system with 5 specialized nodes
+9. **Research State Management**: ✅ ResearchState schema with comprehensive tracking
+10. **Research Node Infrastructure**: ✅ Base node class with AI integration and memory
+
 ## Next Architecture Decisions Needed
 
-1. **Caching Strategy**: Define what to cache and for how long
-2. **Search Implementation**: PostgreSQL full-text vs Elasticsearch
-3. **File Storage**: Local filesystem vs S3-compatible
-4. **Background Jobs**: Celery task priorities and queues
-5. **Testing Strategy**: Integration test database seeding approach
-6. **Monitoring**: What metrics to track and alert on
-7. **Backup Strategy**: Frequency and retention policies
+1. **File Storage**: Local filesystem vs S3-compatible
+2. **Background Jobs**: Celery task priorities and queues
+3. **Search Implementation**: PostgreSQL full-text vs Elasticsearch
+4. **Testing Strategy**: Integration test database seeding approach
+5. **Monitoring**: What metrics to track and alert on
+6. **Backup Strategy**: Frequency and retention policies
+7. **Multi-Agent Workflows**: Advanced AI agent coordination

@@ -24,11 +24,12 @@
 - Celery 5.4.0 - Background task processing
 
 **AI & Machine Learning:**
-- LangChain 0.3.7 - LLM framework
-- LangGraph 0.2.45 - Workflow orchestration
-- LangChain-OpenAI 0.2.8 - OpenAI/OpenRouter integration
-- OpenAI SDK 1.54.3 - API client (OpenRouter compatible)
-- Qdrant Client 1.12.1 - Vector database client
+- LangChain 0.3.7 - LLM framework ✅
+- LangGraph 0.2.45 - Workflow orchestration ✅
+- LangChain-OpenAI 0.2.8 - OpenAI/OpenRouter integration ✅
+- OpenAI SDK 1.54.3 - API client (OpenRouter compatible) ✅
+- Qdrant Client 1.12.1 - Vector database client ✅
+- sentence-transformers 2.7.0 - Text embedding generation ✅
 
 **Authentication & Security:**
 - python-jose 3.3.0 - JWT token handling
@@ -440,27 +441,52 @@ python = "^3.11"
 **Test Structure:**
 ```
 backend/tests/
-├── conftest.py           # Shared fixtures
-├── unit/                 # Fast unit tests
+├── conftest.py           # Shared fixtures ✅
+├── fixtures/             # Test fixtures ✅
+│   ├── auth_fixtures.py  # Auth test data ✅
+│   └── chat_fixtures.py  # Chat test data ✅
+├── unit/                 # Fast unit tests ✅
 │   ├── test_models.py
 │   ├── test_services.py
-│   └── test_utils.py
-└── integration/          # Slower integration tests
+│   ├── test_chat_repository.py  # Chat repository tests ✅
+│   ├── test_chat_service.py     # Chat service tests ✅
+│   ├── test_workflow_state.py   # Workflow state tests ✅
+│   ├── test_workflow_orchestrator.py  # Orchestration tests ✅
+│   └── test_workflow_orchestrator_simple.py  # Simple tests ✅
+└── integration/          # Slower integration tests ✅
     ├── test_api.py
     ├── test_auth.py
-    └── test_workflows.py
+    ├── test_auth_flow.py      # Auth integration tests ✅
+    ├── test_project_flow.py   # Project integration tests ✅
+    ├── test_task_flow.py      # Task integration tests ✅
+    ├── test_milestone_flow.py # Milestone integration tests ✅
+    ├── test_chat_api.py       # Chat API tests ✅
+    ├── test_workflow_api.py   # Workflow API tests ✅
+    └── e2e/                   # End-to-end tests ✅
+        └── test_workflow_execution.py  # Workflow E2E tests ✅
 ```
 
 **Running Tests:**
 ```bash
-# All tests
+# All tests (108 tests total: 16 Phase 1 + 57 Phase 2 chat + 35 workflow)
 pytest
 
-# With coverage
+# With coverage (47% baseline coverage)
 pytest --cov=ardha --cov-report=html
 
 # Specific test file
 pytest tests/unit/test_models.py
+
+# Chat system tests
+pytest tests/unit/test_chat_repository.py -v
+pytest tests/unit/test_chat_service.py -v
+pytest tests/integration/test_chat_api.py -v
+
+# Workflow system tests
+pytest tests/unit/test_workflow_state.py -v
+pytest tests/unit/test_workflow_orchestrator.py -v
+pytest tests/integration/test_workflow_api.py -v
+pytest tests/e2e/test_workflow_execution.py -v
 
 # Specific test
 pytest tests/unit/test_models.py::test_user_creation
@@ -669,12 +695,22 @@ git commit -m "docs(readme): add installation instructions"
 
 ### Adding New Backend Endpoint
 
-1. Define Pydantic schema in `schemas/`
+1. Define Pydantic schema in `schemas/requests/` and `schemas/responses/`
 2. Create route in `api/routes/`
 3. Implement service logic in `services/`
 4. Add database model if needed in `models/`
-5. Write tests in `tests/`
-6. Update OpenAPI docs
+5. Write tests in `tests/unit/` and `tests/integration/`
+6. Update OpenAPI docs (auto-generated)
+
+### Adding New LangGraph Workflow
+
+1. Create workflow class in `workflows/` inheriting from `BaseWorkflow`
+2. Define workflow state in `workflows/state.py`
+3. Implement workflow nodes in `workflows/nodes.py`
+4. Add workflow configuration in `workflows/config.py`
+5. Create API endpoints in `api/routes/workflows.py`
+6. Write comprehensive tests (unit + integration + e2e)
+7. Test with Redis checkpoints and Qdrant memory
 
 ### Adding New Frontend Page
 
@@ -688,17 +724,39 @@ git commit -m "docs(readme): add installation instructions"
 ### Running Database Migration
 
 ```bash
-# Create migration
-alembic revision --autogenerate -m "add user table"
+# Create migration (must set DATABASE__URL)
+DATABASE__URL="postgresql+asyncpg://ardha_user:ardha_password@localhost:5432/ardha_dev" \
+  alembic revision --autogenerate -m "add user table"
 
 # Review generated migration
 # Edit if needed
 
 # Apply migration
-alembic upgrade head
+DATABASE__URL="postgresql+asyncpg://ardha_user:ardha_password@localhost:5432/ardha_dev" \
+  alembic upgrade head
 
 # Rollback if needed
-alembic downgrade -1
+DATABASE__URL="postgresql+asyncpg://ardha_user:ardha_password@localhost:5432/ardha_dev" \
+  alembic downgrade -1
+```
+
+### Testing LangGraph Workflows
+
+```bash
+# Test workflow state management
+pytest tests/unit/test_workflow_state.py -v
+
+# Test workflow orchestration
+pytest tests/unit/test_workflow_orchestrator.py -v
+
+# Test workflow API endpoints
+pytest tests/integration/test_workflow_api.py -v
+
+# Test end-to-end workflow execution
+pytest tests/e2e/test_workflow_execution.py -v
+
+# Test all workflow-related tests
+pytest tests/ -k "workflow" -v
 ```
 
 ### Debugging Tips
@@ -715,6 +773,21 @@ alembic downgrade -1
 - Use `console.log()` strategically
 - Test with browser debugger
 
+## Completed Technical Implementations ✅
+
+1. **LangGraph Workflow System**: ✅ StateGraph with abstract base class, checkpoint system
+2. **Qdrant Vector Database**: ✅ Async client with embedding generation and semantic search
+3. **Redis Checkpoint System**: ✅ Workflow state persistence with 7-day TTL
+4. **AI Node Architecture**: ✅ Five specialized nodes (research, architect, implement, debug, memory)
+5. **Workflow Execution Tracking**: ✅ Real-time monitoring with concurrent execution support
+6. **Comprehensive Test Suite**: ✅ 108 tests (100% pass rate) with unit, integration, and e2e coverage
+7. **Memory Ingestion Pipeline**: ✅ Automatic context ingestion with pattern extraction
+8. **Server-Sent Events**: ✅ Real-time workflow progress streaming
+9. **Research Workflow Implementation**: ✅ Multi-agent research system with 5 specialized nodes
+10. **Research State Management**: ✅ ResearchState schema with comprehensive tracking
+11. **Research Node Infrastructure**: ✅ Base node class with AI integration and memory
+12. **Research Workflow Testing**: ✅ 6 comprehensive tests with 100% pass rate
+
 ## Next Technical Decisions
 
 1. **CI/CD Pipeline**: Define exact GitHub Actions workflow
@@ -724,3 +797,5 @@ alembic downgrade -1
 5. **Logging Format**: Structured JSON logging standards
 6. **Error Handling**: Centralized error handling strategy
 7. **API Versioning**: Versioning strategy for breaking changes
+8. **Multi-Agent Workflows**: Advanced AI agent coordination patterns
+9. **Workflow Templates**: Reusable workflow definitions for common tasks
