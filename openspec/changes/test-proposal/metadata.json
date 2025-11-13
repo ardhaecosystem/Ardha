@@ -1,0 +1,34 @@
+{
+  "proposal_id": "test-proposal",
+  "generated_at": "2024-01-01T00:00:00Z",
+  "workflow_id": "aaa5616f-f11d-4652-9359-5b627757e5c3",
+  "title": "Test Authentication System",
+  "description": "Test description",
+  "objectives": [
+    "Implement auth",
+    "Add social login"
+  ],
+  "scope": {
+    "in_scope": [
+      "Auth"
+    ],
+    "out_of_scope": [
+      "Admin"
+    ]
+  },
+  "success_criteria": [
+    "Users can login",
+    "Password reset works"
+  ],
+  "total_tasks": 5,
+  "estimated_effort": "40 hours",
+  "quality_score": 0.8,
+  "files_generated": [
+    "proposal.md",
+    "tasks.md",
+    "spec-delta.md",
+    "README.md",
+    "risk-assessment.md"
+  ],
+  "change_directory_path": "/home/veda/ardha-projects/Ardha/openspec/changes/test-proposal"
+}

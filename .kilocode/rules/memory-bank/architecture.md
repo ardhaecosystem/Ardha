@@ -118,8 +118,12 @@ backend/src/ardha/
 │   ├── nodes/                # Workflow nodes package
 │   │   ├── __init__.py       # Node exports and imports
 │   │   ├── base.py           # Base node infrastructure (285 lines)
-│   │   └── research_nodes.py # Research workflow nodes (412 lines)
+│   │   ├── research_nodes.py # Research workflow nodes (412 lines)
+│   │   ├── prd_nodes.py      # PRD workflow nodes (285 lines)
+│   │   └── task_generation_nodes.py # Task generation nodes (412 lines)
 │   ├── research_workflow.py  # Research workflow implementation (398 lines)
+│   ├── prd_workflow.py      # PRD workflow implementation (398 lines)
+│   ├── task_generation_workflow.py # Task generation workflow implementation (398 lines)
 │   ├── orchestrator.py       # Orchestration service (398 lines)
 │   ├── memory.py             # Qdrant memory integration (234 lines)
 │   ├── models.py             # Database models (187 lines)

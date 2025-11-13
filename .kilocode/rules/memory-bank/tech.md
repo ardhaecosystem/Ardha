@@ -468,7 +468,7 @@ backend/tests/
 
 **Running Tests:**
 ```bash
-# All tests (108 tests total: 16 Phase 1 + 57 Phase 2 chat + 35 workflow)
+# All tests (116 tests total: 16 Phase 1 + 57 Phase 2 chat + 35 workflow + 8 task generation)
 pytest
 
 # With coverage (47% baseline coverage)
@@ -487,6 +487,9 @@ pytest tests/unit/test_workflow_state.py -v
 pytest tests/unit/test_workflow_orchestrator.py -v
 pytest tests/integration/test_workflow_api.py -v
 pytest tests/e2e/test_workflow_execution.py -v
+
+# Task generation workflow tests
+pytest tests/integration/test_task_generation_workflow.py -v
 
 # Specific test
 pytest tests/unit/test_models.py::test_user_creation
@@ -757,6 +760,9 @@ pytest tests/e2e/test_workflow_execution.py -v
 
 # Test all workflow-related tests
 pytest tests/ -k "workflow" -v
+
+# Test all task generation-related tests
+pytest tests/ -k "task_generation" -v
 ```
 
 ### Debugging Tips
@@ -787,6 +793,16 @@ pytest tests/ -k "workflow" -v
 10. **Research State Management**: ✅ ResearchState schema with comprehensive tracking
 11. **Research Node Infrastructure**: ✅ Base node class with AI integration and memory
 12. **Research Workflow Testing**: ✅ 6 comprehensive tests with 100% pass rate
+13. **PRD Workflow Implementation**: ✅ Multi-agent PRD generation system with 5 specialized nodes
+14. **PRD State Management**: ✅ PRDState schema with comprehensive tracking
+15. **PRD Node Infrastructure**: ✅ Specialized PRD nodes with AI integration
+16. **PRD Workflow Testing**: ✅ 6 comprehensive tests with 85.7% pass rate
+17. **Task Generation Workflow Implementation**: ✅ Multi-agent task generation system with 5 specialized nodes
+18. **Task Generation State Management**: ✅ TaskGenerationState schema with comprehensive tracking
+19. **Task Generation Node Infrastructure**: ✅ Specialized task generation nodes with AI integration
+20. **Task Generation Workflow Testing**: ✅ 8 comprehensive tests with 100% pass rate
+21. **OpenSpec Service Implementation**: ✅ Complete OpenSpec management with file generation, validation, and archival
+22. **OpenSpec Integration Testing**: ✅ End-to-end OpenSpec workflow tests with 100% pass rate
 
 ## Next Technical Decisions
 

@@ -12,6 +12,14 @@ from .nodes.research_nodes import (
 )
 from .research_workflow import ResearchWorkflow, get_research_workflow
 
+# Task Generation workflow
+from .nodes.task_generation_nodes import (
+    AnalyzePRDNode, BreakdownTasksNode,
+    DefineDependenciesNode, EstimateEffortNode, GenerateOpenSpecNode,
+    TaskGenerationNodeException
+)
+from .task_generation_workflow import TaskGenerationWorkflow, get_task_generation_workflow
+
 __all__ = [
     "WorkflowState",
     "WorkflowStatus",
@@ -22,4 +30,13 @@ __all__ = [
     "SynthesizeResearchNode",
     "ResearchWorkflow",
     "get_research_workflow",
+    # Task Generation workflow
+    "AnalyzePRDNode",
+    "BreakdownTasksNode",
+    "DefineDependenciesNode",
+    "EstimateEffortNode",
+    "GenerateOpenSpecNode",
+    "TaskGenerationNodeException",
+    "TaskGenerationWorkflow",
+    "get_task_generation_workflow",
 ]

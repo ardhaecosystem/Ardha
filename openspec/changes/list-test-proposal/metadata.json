@@ -1,0 +1,21 @@
+{
+  "proposal_id": "list-test-proposal",
+  "generated_at": "2024-01-01T00:00:00Z",
+  "workflow_id": "fdb9ecca-264c-45ac-9c7a-9dd4a1d1c3f8",
+  "title": null,
+  "description": null,
+  "objectives": [],
+  "scope": {},
+  "success_criteria": [],
+  "total_tasks": 1,
+  "estimated_effort": "10 hours",
+  "quality_score": 0.8,
+  "files_generated": [
+    "proposal.md",
+    "tasks.md",
+    "spec-delta.md",
+    "README.md",
+    "risk-assessment.md"
+  ],
+  "change_directory_path": "/home/veda/ardha-projects/Ardha/openspec/changes/list-test-proposal"
+}
