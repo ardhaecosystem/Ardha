@@ -34,6 +34,12 @@ def event_loop():
     loop.close()
 
 
+# Fix pytest-asyncio deprecation warning
+@pytest.fixture(scope="session")
+def anyio_backend():
+    return "asyncio"
+
+
 @pytest_asyncio.fixture(scope="function")
 async def test_db() -> AsyncGenerator[AsyncSession, None]:
     """

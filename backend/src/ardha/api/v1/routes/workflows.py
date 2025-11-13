@@ -2,7 +2,7 @@
 Workflow API endpoints.
 
 This module provides REST API endpoints for managing
-and executing AI workflows using workflow orchestration service.
+and executing AI workflows using workflow service layer.
 """
 
 import asyncio
@@ -12,8 +12,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....core.security import get_current_user
+from ....core.database import get_db
 from ....schemas.requests.workflow import (
     WorkflowCreateRequest, WorkflowExecuteRequest
 )
@@ -21,8 +23,8 @@ from ....schemas.responses.workflow import (
     WorkflowResponse, WorkflowExecutionResponse,
     WorkflowStatusResponse, WorkflowListResponse
 )
-from ....workflows.orchestrator import get_workflow_orchestrator
-from ....workflows.state import WorkflowType
+from ....services.workflow_service import WorkflowService
+from ....workflows.state import WorkflowType, WorkflowStatus
 from ....models.user import User
 
 logger = logging.getLogger(__name__)
@@ -30,58 +32,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
 
-@router.post("/", response_model=WorkflowResponse)
-async def create_workflow(
-    request: WorkflowCreateRequest,
-    current_user: User = Depends(get_current_user),
-) -> WorkflowResponse:
-    """
-    Create a new workflow.
-    
-    Args:
-        request: Workflow creation request
-        current_user: Authenticated user
-        
-    Returns:
-        Created workflow details
-        
-    Raises:
-        HTTPException: If workflow creation fails
-    """
-    try:
-        orchestrator = get_workflow_orchestrator()
-        
-        # Convert workflow type string to enum
-        workflow_type = WorkflowType(request.workflow_type)
-        
-        # For now, return a mock response since create_workflow is not implemented
-        from uuid import uuid4
-        workflow_id = uuid4()
-        
-        return WorkflowResponse(
-            id=workflow_id,
-            name=request.name,
-            description=request.description,
-            workflow_type=request.workflow_type,
-            node_sequence={"nodes": request.node_sequence or []},
-            default_parameters=request.default_parameters or {},
-            user_id=current_user.id,
-            project_id=request.project_id,
-            created_at="2024-01-01T00:00:00Z",
-            updated_at="2024-01-01T00:00:00Z",
-        )
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to create workflow: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
 @router.post("/execute", response_model=WorkflowExecutionResponse)
 async def execute_workflow(
     request: WorkflowExecuteRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> WorkflowExecutionResponse:
     """
     Execute a workflow.
@@ -97,52 +52,42 @@ async def execute_workflow(
         HTTPException: If execution fails
     """
     try:
-        orchestrator = get_workflow_orchestrator()
-        
-        # Convert workflow type string to enum
-        workflow_type = WorkflowType(request.workflow_type)
+        service = WorkflowService(db)
         
         # Execute workflow
-        state = await orchestrator.execute_workflow(
-            workflow_type=workflow_type,
-            initial_request=request.initial_request,
+        execution = await service.execute_workflow(
             user_id=current_user.id,
+            workflow_type=request.workflow_type,
+            initial_request=request.initial_request,
             project_id=request.project_id,
             parameters=request.parameters,
             context=request.context,
         )
         
-        # Calculate total tokens safely
-        total_tokens = 0
-        if state.token_usage:
-            for v in state.token_usage.values():
-                if isinstance(v, (int, float)):
-                    total_tokens += v
-        
         return WorkflowExecutionResponse(
-            id=state.execution_id,
-            workflow_id=state.workflow_id,
-            user_id=state.user_id,
-            project_id=state.project_id,
-            initial_request=state.initial_request,
-            context=state.context,
-            parameters=state.parameters,
-            status=state.status,
-            current_node=state.current_node,
-            completed_nodes=state.completed_nodes,
-            failed_nodes=state.failed_nodes,
-            results=state.results,
-            artifacts=state.artifacts,
-            metadata=state.metadata,
-            ai_calls=state.ai_calls,
-            token_usage={"total": int(total_tokens)},
-            total_cost=state.total_cost,
-            errors=state.errors,
-            retry_count=state.retry_count,
-            created_at=state.created_at or "",
-            started_at=state.started_at,
-            completed_at=state.completed_at,
-            last_activity=state.last_activity,
+            id=execution.id,
+            workflow_id=execution.id,  # Same for now
+            user_id=execution.user_id,
+            project_id=execution.project_id,
+            initial_request=execution.input_data.get("initial_request", ""),
+            context=execution.input_data.get("context", {}),
+            parameters=execution.input_data.get("parameters", {}),
+            status=execution.status,
+            current_node=None,
+            completed_nodes=[],
+            failed_nodes=[],
+            results=execution.output_data.get("results", {}),
+            artifacts=execution.output_data.get("artifacts", {}),
+            metadata=execution.output_data.get("metadata", {}),
+            ai_calls=[],
+            token_usage={"total": execution.total_tokens},
+            total_cost=float(execution.total_cost),
+            errors=[],
+            retry_count=0,
+            created_at=execution.created_at.isoformat() if execution.created_at else "",
+            started_at=execution.started_at.isoformat() if execution.started_at else None,
+            completed_at=execution.completed_at.isoformat() if execution.completed_at else None,
+            last_activity=execution.updated_at.isoformat() if execution.updated_at else None,
         )
         
     except ValueError as e:
@@ -156,6 +101,7 @@ async def execute_workflow(
 async def get_execution_status(
     execution_id: UUID,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> WorkflowStatusResponse:
     """
     Get workflow execution status.
@@ -171,37 +117,26 @@ async def get_execution_status(
         HTTPException: If execution not found
     """
     try:
-        orchestrator = get_workflow_orchestrator()
+        service = WorkflowService(db)
         
-        state = await orchestrator.get_execution_status(execution_id)
-        if not state:
+        execution = await service.get_execution(execution_id, current_user.id)
+        if not execution:
             raise HTTPException(status_code=404, detail="Execution not found")
         
-        # Check if user owns this execution
-        if state.user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
-        # Calculate total tokens safely
-        total_tokens = 0
-        if state.token_usage:
-            for v in state.token_usage.values():
-                if isinstance(v, (int, float)):
-                    total_tokens += v
-        
         return WorkflowStatusResponse(
-            execution_id=state.execution_id,
-            workflow_id=state.workflow_id,
-            status=state.status,
-            current_node=state.current_node,
-            completed_nodes=state.completed_nodes,
-            failed_nodes=state.failed_nodes,
-            progress=state.get_progress(),
-            results=state.results,
-            artifacts=state.artifacts,
-            errors=state.errors,
-            total_cost=state.total_cost,
-            token_usage={"total": int(total_tokens)},
-            last_activity=state.last_activity,
+            execution_id=execution.id,
+            workflow_id=execution.id,
+            status=execution.status,
+            current_node=None,
+            completed_nodes=[],
+            failed_nodes=[],
+            progress=100.0 if execution.is_completed else 0.0,
+            results=execution.output_data.get("results", {}),
+            artifacts=execution.output_data.get("artifacts", {}),
+            errors=[],
+            total_cost=float(execution.total_cost),
+            token_usage={"total": execution.total_tokens},
+            last_activity=execution.updated_at.isoformat() if execution.updated_at else None,
         )
         
     except HTTPException:
@@ -212,10 +147,11 @@ async def get_execution_status(
 
 
 @router.post("/executions/{execution_id}/cancel")
-async def cancel_execution(
+async def cancel_workflow_execution(
     execution_id: UUID,
     reason: Optional[str] = None,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     Cancel a running workflow execution.
@@ -232,21 +168,11 @@ async def cancel_execution(
         HTTPException: If cancellation fails
     """
     try:
-        orchestrator = get_workflow_orchestrator()
+        service = WorkflowService(db)
         
-        # Get execution to verify ownership
-        state = await orchestrator.get_execution_status(execution_id)
-        if not state:
-            raise HTTPException(status_code=404, detail="Execution not found")
-        
-        # Check if user owns this execution
-        if state.user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
-        # Cancel execution
-        success = await orchestrator.cancel_execution(execution_id, reason)
+        success = await service.cancel_execution(execution_id, current_user.id, reason)
         if not success:
-            raise HTTPException(status_code=400, detail="Cannot cancel completed execution")
+            raise HTTPException(status_code=400, detail="Cannot cancel execution")
         
         return {
             "message": "Execution cancelled successfully",
@@ -261,97 +187,77 @@ async def cancel_execution(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/types", response_model=List[str])
-async def get_workflow_types(
-    current_user: User = Depends(get_current_user),
-) -> List[str]:
-    """
-    Get available workflow types.
-    
-    Args:
-        current_user: Authenticated user
-        
-    Returns:
-        List of available workflow types
-    """
-    try:
-        return [workflow_type.value for workflow_type in WorkflowType]
-        
-    except Exception as e:
-        logger.error(f"Failed to get workflow types: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
 @router.get("/executions", response_model=WorkflowListResponse)
-async def list_executions(
-    limit: int = Query(50, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    status: Optional[str] = Query(None),
+async def list_user_executions(
+    status: Optional[WorkflowStatus] = Query(None, description="Filter by status"),
+    workflow_type: Optional[str] = Query(None, description="Filter by workflow type"),
+    project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+    limit: int = Query(50, ge=1, le=100, description="Maximum number of results"),
+    offset: int = Query(0, ge=0, description="Number of results to skip"),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> WorkflowListResponse:
     """
-    List workflow executions for current user.
+    List workflow executions for the current user.
     
     Args:
-        limit: Maximum number of executions to return
-        offset: Number of executions to skip
-        status: Filter by execution status
+        status: Optional status filter
+        workflow_type: Optional workflow type filter
+        project_id: Optional project ID filter
+        limit: Maximum number of results
+        offset: Number of results to skip
         current_user: Authenticated user
         
     Returns:
         List of workflow executions
+        
+    Raises:
+        HTTPException: If listing fails
     """
     try:
-        orchestrator = get_workflow_orchestrator()
+        service = WorkflowService(db)
         
-        # Get all active executions for this user
-        user_executions = []
-        for execution_id, state in orchestrator.active_executions.items():
-            if state.user_id == current_user.id:
-                # Filter by status if provided
-                if status and state.status.value != status:
-                    continue
-                
-                # Calculate total tokens safely
-                total_tokens = 0
-                if state.token_usage:
-                    for v in state.token_usage.values():
-                        if isinstance(v, (int, float)):
-                            total_tokens += v
-                
-                user_executions.append(WorkflowExecutionResponse(
-                    id=state.execution_id,
-                    workflow_id=state.workflow_id,
-                    user_id=state.user_id,
-                    project_id=state.project_id,
-                    initial_request=state.initial_request,
-                    context=state.context,
-                    parameters=state.parameters,
-                    status=state.status,
-                    current_node=state.current_node,
-                    completed_nodes=state.completed_nodes,
-                    failed_nodes=state.failed_nodes,
-                    results=state.results,
-                    artifacts=state.artifacts,
-                    metadata=state.metadata,
-                    ai_calls=state.ai_calls,
-                    token_usage={"total": int(total_tokens)},
-                    total_cost=state.total_cost,
-                    errors=state.errors,
-                    retry_count=state.retry_count,
-                    created_at=state.created_at or "",
-                    started_at=state.started_at,
-                    completed_at=state.completed_at,
-                    last_activity=state.last_activity,
-                ))
+        executions = await service.list_user_executions(
+            user_id=current_user.id,
+            status=status,
+            workflow_type=workflow_type,
+            project_id=project_id,
+            limit=limit,
+            offset=offset
+        )
         
-        # Apply pagination
-        total = len(user_executions)
-        executions = user_executions[offset:offset + limit]
+        # Convert to response format
+        execution_responses = []
+        for execution in executions:
+            execution_responses.append(WorkflowExecutionResponse(
+                id=execution.id,
+                workflow_id=execution.id,
+                user_id=execution.user_id,
+                project_id=execution.project_id,
+                initial_request=execution.input_data.get("initial_request", ""),
+                context=execution.input_data.get("context", {}),
+                parameters=execution.input_data.get("parameters", {}),
+                status=execution.status,
+                current_node=None,
+                completed_nodes=[],
+                failed_nodes=[],
+                results=execution.output_data.get("results", {}),
+                artifacts=execution.output_data.get("artifacts", {}),
+                metadata=execution.output_data.get("metadata", {}),
+                ai_calls=[],
+                token_usage={"total": execution.total_tokens},
+                total_cost=float(execution.total_cost),
+                errors=[],
+                retry_count=0,
+                created_at=execution.created_at.isoformat() if execution.created_at else "",
+                started_at=execution.started_at.isoformat() if execution.started_at else None,
+                completed_at=execution.completed_at.isoformat() if execution.completed_at else None,
+                last_activity=execution.updated_at.isoformat() if execution.updated_at else None,
+            ))
         
         return WorkflowListResponse(
-            executions=executions,
-            total=total,
+            executions=execution_responses,
+            total=len(execution_responses),
             limit=limit,
             offset=offset,
         )
@@ -361,75 +267,84 @@ async def list_executions(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/executions/{execution_id}/stream")
-async def stream_execution(
+@router.delete("/executions/{execution_id}")
+async def delete_workflow_execution(
     execution_id: UUID,
     current_user: User = Depends(get_current_user),
-) -> StreamingResponse:
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, str]:
     """
-    Stream workflow execution updates in real-time.
+    Delete a workflow execution.
     
     Args:
         execution_id: Execution identifier
         current_user: Authenticated user
         
     Returns:
-        Server-sent events stream
+        Deletion confirmation
         
     Raises:
-        HTTPException: If streaming fails
+        HTTPException: If deletion fails
     """
     try:
-        orchestrator = get_workflow_orchestrator()
+        service = WorkflowService(db)
         
-        # Get execution to verify ownership
-        state = await orchestrator.get_execution_status(execution_id)
-        if not state:
+        success = await service.delete_execution(execution_id, current_user.id)
+        if not success:
             raise HTTPException(status_code=404, detail="Execution not found")
         
-        # Check if user owns this execution
-        if state.user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
-        async def event_stream():
-            """Generate server-sent events for execution updates."""
-            try:
-                # Send initial status
-                yield f"data: {state.status.value}\n\n"
-                
-                # Poll for updates (simplified - in production use WebSocket)
-                last_update = state.last_activity
-                while state.status.value in ["pending", "running"]:
-                    await asyncio.sleep(1)  # Poll every second
-                    
-                    current_state = await orchestrator.get_execution_status(execution_id)
-                    if current_state and current_state.last_activity != last_update:
-                        yield f"data: {current_state.status.value}\n\n"
-                        last_update = current_state.last_activity
-                    
-                    # Exit if execution is complete
-                    if current_state and current_state.status.value not in ["pending", "running"]:
-                        break
-                
-                # Send completion event
-                yield "event: complete\ndata: {}\n\n"
-                
-            except Exception as e:
-                logger.error(f"Error in event stream: {e}")
-                yield f"event: error\ndata: {{'error': '{str(e)}'}}\n\n"
-        
-        return StreamingResponse(
-            event_stream(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "Access-Control-Allow-Origin": "*",
-            }
-        )
+        return {"message": "Execution deleted successfully"}
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to stream execution: {e}")
+        logger.error(f"Failed to delete execution: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/types", response_model=List[str])
+async def get_workflow_types() -> List[str]:
+    """
+    Get available workflow types.
+    
+    Returns:
+        List of available workflow types
+    """
+    return [wt.value for wt in WorkflowType]
+
+
+@router.get("/stats")
+async def get_workflow_stats(
+    workflow_type: Optional[str] = Query(None, description="Filter by workflow type"),
+    project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Get workflow execution statistics.
+    
+    Args:
+        workflow_type: Optional workflow type filter
+        project_id: Optional project ID filter
+        current_user: Authenticated user
+        
+    Returns:
+        Workflow execution statistics
+        
+    Raises:
+        HTTPException: If stats retrieval fails
+    """
+    try:
+        service = WorkflowService(db)
+        
+        stats = await service.get_execution_stats(
+            user_id=current_user.id,
+            workflow_type=workflow_type,
+            project_id=project_id
+        )
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Failed to get workflow stats: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

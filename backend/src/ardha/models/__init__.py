@@ -16,6 +16,7 @@ from ardha.models.user import User
 from ardha.models.chat import Chat
 from ardha.models.message import Message
 from ardha.models.ai_usage import AIUsage
+from ardha.models.workflow_execution import WorkflowExecution
 
 __all__ = [
     "Base",
@@ -32,4 +33,5 @@ __all__ = [
     "Chat",
     "Message",
     "AIUsage",
+    "WorkflowExecution",
 ]

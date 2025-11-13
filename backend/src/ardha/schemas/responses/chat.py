@@ -8,7 +8,7 @@ including chat information, messages, and summaries.
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChatResponse(BaseModel):
@@ -24,11 +24,12 @@ class ChatResponse(BaseModel):
     total_tokens: int = Field(description="Total tokens used in chat")
     total_cost: float = Field(description="Total cost of chat in USD")
     
-    class Config:
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda v: v.isoformat(),
             UUID: lambda v: str(v),
         }
+    )
 
 
 class MessageResponse(BaseModel):
@@ -38,17 +39,19 @@ class MessageResponse(BaseModel):
     role: str = Field(description="Message role (system, user, assistant, tool)")
     content: str = Field(description="Message content")
     created_at: datetime = Field(description="Message creation timestamp")
-    model_used: Optional[str] = Field(default=None, description="AI model used for assistant messages")
+    ai_model: Optional[str] = Field(default=None, description="AI model used for assistant messages")
     tokens_input: Optional[int] = Field(default=None, description="Input tokens used")
     tokens_output: Optional[int] = Field(default=None, description="Output tokens used")
     cost: Optional[float] = Field(default=None, description="Cost of this message in USD")
     message_metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional message metadata")
     
-    class Config:
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda v: v.isoformat(),
             UUID: lambda v: str(v),
-        }
+        },
+        protected_namespaces=()
+    )
 
 
 class MessageStats(BaseModel):
@@ -69,13 +72,15 @@ class RecentMessage(BaseModel):
     role: str = Field(description="Message role")
     content: str = Field(description="Message content (truncated)")
     created_at: datetime = Field(description="Message creation timestamp")
-    model_used: Optional[str] = Field(default=None, description="AI model used")
+    ai_model: Optional[str] = Field(default=None, description="AI model used")
     
-    class Config:
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda v: v.isoformat(),
             UUID: lambda v: str(v),
-        }
+        },
+        protected_namespaces=()
+    )
 
 
 class ChatSummaryResponse(BaseModel):
@@ -85,11 +90,12 @@ class ChatSummaryResponse(BaseModel):
     message_stats: MessageStats = Field(description="Message statistics")
     recent_messages: List[RecentMessage] = Field(description="Recent messages (last 5)")
     
-    class Config:
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda v: v.isoformat(),
             UUID: lambda v: str(v),
         }
+    )
 
 
 class ChatListResponse(BaseModel):
@@ -98,11 +104,12 @@ class ChatListResponse(BaseModel):
     chats: List[ChatResponse] = Field(description="List of chats")
     total_count: int = Field(description="Total number of chats")
     
-    class Config:
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda v: v.isoformat(),
             UUID: lambda v: str(v),
         }
+    )
 
 
 class MessageListResponse(BaseModel):
@@ -112,8 +119,9 @@ class MessageListResponse(BaseModel):
     total_count: int = Field(description="Total number of messages")
     has_more: bool = Field(description="Whether there are more messages")
     
-    class Config:
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda v: v.isoformat(),
             UUID: lambda v: str(v),
         }
+    )
