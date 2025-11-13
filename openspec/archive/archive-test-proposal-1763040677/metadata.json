@@ -1,7 +1,7 @@
 {
-  "proposal_id": "list-test-proposal",
+  "proposal_id": "archive-test-proposal-1763040677",
   "generated_at": "2024-01-01T00:00:00Z",
-  "workflow_id": "4bd56a19-25b0-4e24-9eb8-96e33c6d59f0",
+  "workflow_id": "2d7da970-0ced-4c85-b07f-777b5a51307e",
   "title": null,
   "description": null,
   "objectives": [],
@@ -17,5 +17,5 @@
     "README.md",
     "risk-assessment.md"
   ],
-  "change_directory_path": "/home/veda/ardha-projects/Ardha/openspec/changes/list-test-proposal"
+  "change_directory_path": "/home/veda/ardha-projects/Ardha/openspec/changes/archive-test-proposal-1763040677"
 }

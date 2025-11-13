@@ -4,7 +4,7 @@ repos:
     rev: 24.10.0
     hooks:
       - id: black
-        language_version: python3.11
+        language_version: python3.12
         args: [--line-length=100]
         files: ^backend/
 
@@ -26,7 +26,9 @@ repos:
     rev: v1.13.0
     hooks:
       - id: mypy
-        additional_dependencies: [types-all]
+        # Removed types-all as it causes dependency resolution issues.
+        # Add specific types here if mypy complains about missing stubs.
+        additional_dependencies: []
         files: ^backend/src/
         args: [--ignore-missing-imports, --strict]
 

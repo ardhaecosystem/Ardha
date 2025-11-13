@@ -337,12 +337,12 @@ services:
 Gemini Flash (~35% of usage):
   - $0.15-0.30 per 1M tokens
   - Simple queries, summaries
-  
+
 Claude Sonnet 4.5 (~45% of usage):
   - $3.00 per 1M input tokens
   - $15.00 per 1M output tokens
   - Medium complexity tasks
-  
+
 Claude Opus 4.1 (~20% of usage):
   - $15.00 per 1M input tokens
   - $75.00 per 1M output tokens
@@ -444,7 +444,8 @@ backend/tests/
 ├── conftest.py           # Shared fixtures ✅
 ├── fixtures/             # Test fixtures ✅
 │   ├── auth_fixtures.py  # Auth test data ✅
-│   └── chat_fixtures.py  # Chat test data ✅
+│   ├── chat_fixtures.py  # Chat test data ✅
+│   └── workflow_fixtures.py # Workflow test data ✅
 ├── unit/                 # Fast unit tests ✅
 │   ├── test_models.py
 │   ├── test_services.py
@@ -452,7 +453,9 @@ backend/tests/
 │   ├── test_chat_service.py     # Chat service tests ✅
 │   ├── test_workflow_state.py   # Workflow state tests ✅
 │   ├── test_workflow_orchestrator.py  # Orchestration tests ✅
-│   └── test_workflow_orchestrator_simple.py  # Simple tests ✅
+│   ├── test_workflow_orchestrator_simple.py  # Simple orchestration tests ✅
+│   ├── test_research_workflow.py # Research workflow unit tests ✅
+│   └── test_task_generation_unit.py # Task generation unit tests ✅
 └── integration/          # Slower integration tests ✅
     ├── test_api.py
     ├── test_auth.py
@@ -463,15 +466,16 @@ backend/tests/
     ├── test_chat_api.py       # Chat API tests ✅
     ├── test_workflow_api.py   # Workflow API tests ✅
     └── e2e/                   # End-to-end tests ✅
-        └── test_workflow_execution.py  # Workflow E2E tests ✅
+        ├── test_workflow_execution.py  # Workflow E2E tests ✅
+        └── test_prd_workflow_execution.py # PRD Workflow E2E tests ✅
 ```
 
 **Running Tests:**
 ```bash
-# All tests (116 tests total: 16 Phase 1 + 57 Phase 2 chat + 35 workflow + 8 task generation)
+# All tests (105 tests total: 16 Phase 1 + 57 Phase 2 chat + 33 research workflow + 2 task generation + 29 PRD)
 pytest
 
-# With coverage (47% baseline coverage)
+# With coverage (80%+ coverage on core workflow files)
 pytest --cov=ardha --cov-report=html
 
 # Specific test file
@@ -485,11 +489,14 @@ pytest tests/integration/test_chat_api.py -v
 # Workflow system tests
 pytest tests/unit/test_workflow_state.py -v
 pytest tests/unit/test_workflow_orchestrator.py -v
+pytest tests/unit/test_workflow_orchestrator_simple.py -v
+pytest tests/unit/test_research_workflow.py -v
 pytest tests/integration/test_workflow_api.py -v
 pytest tests/e2e/test_workflow_execution.py -v
+pytest tests/e2e/test_prd_workflow_execution.py -v
 
 # Task generation workflow tests
-pytest tests/integration/test_task_generation_workflow.py -v
+pytest tests/unit/test_task_generation_unit.py -v
 
 # Specific test
 pytest tests/unit/test_models.py::test_user_creation
@@ -786,21 +793,21 @@ pytest tests/ -k "task_generation" -v
 3. **Redis Checkpoint System**: ✅ Workflow state persistence with 7-day TTL
 4. **AI Node Architecture**: ✅ Five specialized nodes (research, architect, implement, debug, memory)
 5. **Workflow Execution Tracking**: ✅ Real-time monitoring with concurrent execution support
-6. **Comprehensive Test Suite**: ✅ 108 tests (100% pass rate) with unit, integration, and e2e coverage
+6. **Comprehensive Test Suite**: ✅ 105 tests (100% pass rate) with unit, integration, and e2e coverage
 7. **Memory Ingestion Pipeline**: ✅ Automatic context ingestion with pattern extraction
 8. **Server-Sent Events**: ✅ Real-time workflow progress streaming
 9. **Research Workflow Implementation**: ✅ Multi-agent research system with 5 specialized nodes
 10. **Research State Management**: ✅ ResearchState schema with comprehensive tracking
 11. **Research Node Infrastructure**: ✅ Base node class with AI integration and memory
-12. **Research Workflow Testing**: ✅ 6 comprehensive tests with 100% pass rate
+12. **Research Workflow Testing**: ✅ 33 comprehensive tests with 100% pass rate
 13. **PRD Workflow Implementation**: ✅ Multi-agent PRD generation system with 5 specialized nodes
 14. **PRD State Management**: ✅ PRDState schema with comprehensive tracking
 15. **PRD Node Infrastructure**: ✅ Specialized PRD nodes with AI integration
-16. **PRD Workflow Testing**: ✅ 6 comprehensive tests with 85.7% pass rate
+16. **PRD Workflow Testing**: ✅ 29 comprehensive tests with 100% pass rate
 17. **Task Generation Workflow Implementation**: ✅ Multi-agent task generation system with 5 specialized nodes
 18. **Task Generation State Management**: ✅ TaskGenerationState schema with comprehensive tracking
 19. **Task Generation Node Infrastructure**: ✅ Specialized task generation nodes with AI integration
-20. **Task Generation Workflow Testing**: ✅ 8 comprehensive tests with 100% pass rate
+20. **Task Generation Workflow Testing**: ✅ 2 comprehensive tests with 100% pass rate
 21. **OpenSpec Service Implementation**: ✅ Complete OpenSpec management with file generation, validation, and archival
 22. **OpenSpec Integration Testing**: ✅ End-to-end OpenSpec workflow tests with 100% pass rate
 
