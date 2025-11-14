@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from ardha.models.task_activity import TaskActivity
     from ardha.models.chat import Chat
     from ardha.models.ai_usage import AIUsage
+    from ardha.models.memory import Memory
 
 
 class User(Base, BaseModel):
@@ -168,6 +169,13 @@ class User(Base, BaseModel):
     
     ai_usage: Mapped[list["AIUsage"]] = relationship(
         "AIUsage",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
+    
+    memories: Mapped[list["Memory"]] = relationship(
+        "Memory",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="select"

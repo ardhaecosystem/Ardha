@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from ardha.models.user import User
     from ardha.models.chat import Chat
     from ardha.models.ai_usage import AIUsage
+    from ardha.models.memory import Memory
 
 
 class Project(BaseModel, Base):
@@ -183,6 +184,13 @@ class Project(BaseModel, Base):
     
     ai_usage: Mapped[list["AIUsage"]] = relationship(
         "AIUsage",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
+    
+    memories: Mapped[list["Memory"]] = relationship(
+        "Memory",
         back_populates="project",
         cascade="all, delete-orphan",
         lazy="select"
