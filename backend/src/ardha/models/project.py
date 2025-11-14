@@ -9,29 +9,29 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ardha.models.base import Base, BaseModel
 
 if TYPE_CHECKING:
+    from ardha.models.ai_usage import AIUsage
+    from ardha.models.chat import Chat
+    from ardha.models.memory import Memory
     from ardha.models.milestone import Milestone
     from ardha.models.project_member import ProjectMember
     from ardha.models.task import Task
     from ardha.models.task_tag import TaskTag
     from ardha.models.user import User
-    from ardha.models.chat import Chat
-    from ardha.models.ai_usage import AIUsage
-    from ardha.models.memory import Memory
 
 
 class Project(BaseModel, Base):
     """
     Project model representing a project workspace.
-    
+
     Projects are the primary organizational unit in Ardha, containing tasks,
     files, Git repositories, and team members with role-based permissions.
-    
+
     Attributes:
         name: Project display name (max 255 chars, indexed for search)
         description: Optional detailed project description
@@ -48,154 +48,102 @@ class Project(BaseModel, Base):
         owner: Relationship to User who owns the project
         members: Relationship to ProjectMember association records
     """
-    
+
     __tablename__ = "projects"
-    
+
     # Core fields
     name: Mapped[str] = mapped_column(
-        String(255),
-        nullable=False,
-        index=True,
-        comment="Project display name"
+        String(255), nullable=False, index=True, comment="Project display name"
     )
-    
+
     description: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-        comment="Project description"
+        Text, nullable=True, comment="Project description"
     )
-    
+
     slug: Mapped[str] = mapped_column(
-        String(255),
-        unique=True,
-        nullable=False,
-        index=True,
-        comment="URL-safe unique identifier"
+        String(255), unique=True, nullable=False, index=True, comment="URL-safe unique identifier"
     )
-    
+
     # Ownership
     owner_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="UUID of the project owner"
+        comment="UUID of the project owner",
     )
-    
+
     # Settings
     visibility: Mapped[str] = mapped_column(
         String(50),
         default="private",
         nullable=False,
-        comment="Access control level (private/team/public)"
+        comment="Access control level (private/team/public)",
     )
-    
+
     tech_stack: Mapped[list[str]] = mapped_column(
-        JSON,
-        default=list,
-        nullable=False,
-        comment="JSON array of technology tags"
+        JSON, default=list, nullable=False, comment="JSON array of technology tags"
     )
-    
+
     # Git integration
     git_repo_url: Mapped[str | None] = mapped_column(
-        String(500),
-        nullable=True,
-        comment="Git repository URL"
+        String(500), nullable=True, comment="Git repository URL"
     )
-    
+
     git_branch: Mapped[str] = mapped_column(
-        String(255),
-        default="main",
-        nullable=False,
-        comment="Default Git branch name"
+        String(255), default="main", nullable=False, comment="Default Git branch name"
     )
-    
+
     # OpenSpec configuration
     openspec_enabled: Mapped[bool] = mapped_column(
-        Boolean,
-        default=True,
-        nullable=False,
-        comment="Whether OpenSpec is enabled"
+        Boolean, default=True, nullable=False, comment="Whether OpenSpec is enabled"
     )
-    
+
     openspec_path: Mapped[str] = mapped_column(
-        String(255),
-        default="openspec/",
-        nullable=False,
-        comment="Path to OpenSpec directory"
+        String(255), default="openspec/", nullable=False, comment="Path to OpenSpec directory"
     )
-    
+
     # Archive
     is_archived: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-        nullable=False,
-        index=True,
-        comment="Whether project is archived"
+        Boolean, default=False, nullable=False, index=True, comment="Whether project is archived"
     )
-    
+
     archived_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        comment="Timestamp when project was archived"
+        DateTime(timezone=True), nullable=True, comment="Timestamp when project was archived"
     )
-    
+
     # Relationships
     owner: Mapped["User"] = relationship(
-        "User",
-        back_populates="owned_projects",
-        foreign_keys=[owner_id]
+        "User", back_populates="owned_projects", foreign_keys=[owner_id]
     )
-    
+
     members: Mapped[list["ProjectMember"]] = relationship(
-        "ProjectMember",
-        back_populates="project",
-        cascade="all, delete-orphan",
-        lazy="select"
+        "ProjectMember", back_populates="project", cascade="all, delete-orphan", lazy="select"
     )
-    
+
     tasks: Mapped[list["Task"]] = relationship(
-        "Task",
-        back_populates="project",
-        cascade="all, delete-orphan",
-        lazy="select"
+        "Task", back_populates="project", cascade="all, delete-orphan", lazy="select"
     )
-    
+
     task_tags: Mapped[list["TaskTag"]] = relationship(
-        "TaskTag",
-        back_populates="project",
-        cascade="all, delete-orphan",
-        lazy="select"
+        "TaskTag", back_populates="project", cascade="all, delete-orphan", lazy="select"
     )
-    
+
     milestones: Mapped[list["Milestone"]] = relationship(
-        "Milestone",
-        back_populates="project",
-        cascade="all, delete-orphan",
-        lazy="select"
+        "Milestone", back_populates="project", cascade="all, delete-orphan", lazy="select"
     )
-    
+
     chats: Mapped[list["Chat"]] = relationship(
-        "Chat",
-        back_populates="project",
-        cascade="all, delete-orphan",
-        lazy="select"
+        "Chat", back_populates="project", cascade="all, delete-orphan", lazy="select"
     )
-    
+
     ai_usage: Mapped[list["AIUsage"]] = relationship(
-        "AIUsage",
-        back_populates="project",
-        cascade="all, delete-orphan",
-        lazy="select"
+        "AIUsage", back_populates="project", cascade="all, delete-orphan", lazy="select"
     )
-    
+
     memories: Mapped[list["Memory"]] = relationship(
-        "Memory",
-        back_populates="project",
-        cascade="all, delete-orphan",
-        lazy="select"
+        "Memory", back_populates="project", cascade="all, delete-orphan", lazy="select"
     )
-    
+
     def __repr__(self) -> str:
         """String representation for debugging."""
         return (
