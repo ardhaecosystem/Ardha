@@ -177,7 +177,7 @@ class MemoryRepository:
             logger.error(f"Error fetching memory by id {memory_id}: {e}", exc_info=True)
             raise
 
-    async def update(self, memory_id: UUID, **kwargs) -> Optional[Memory]:
+    async def update(self, memory_id: UUID, **kwargs: Any) -> Optional[Memory]:
         """
         Update a memory record.
 
@@ -329,7 +329,7 @@ class MemoryRepository:
 
             # Filter out archived memories by default
             if not include_archived:
-                stmt = stmt.where(Memory.is_archived == False)
+                stmt = stmt.where(Memory.is_archived.is_(False))
 
             # Order by most recent first
             stmt = stmt.order_by(Memory.created_at.desc())
@@ -376,7 +376,7 @@ class MemoryRepository:
 
             # Filter out archived memories by default
             if not include_archived:
-                stmt = stmt.where(Memory.is_archived == False)
+                stmt = stmt.where(Memory.is_archived.is_(False))
 
             # Order by importance first, then by created_at
             stmt = stmt.order_by(Memory.importance.desc(), Memory.created_at.desc())
@@ -425,7 +425,7 @@ class MemoryRepository:
                     and_(
                         Memory.user_id == user_id,
                         Memory.created_at >= cutoff_time,
-                        Memory.is_archived == False,
+                        Memory.is_archived.is_(False),
                     )
                 )
                 .order_by(Memory.created_at.desc())
@@ -471,7 +471,7 @@ class MemoryRepository:
                     and_(
                         Memory.user_id == user_id,
                         Memory.importance >= min_importance,
-                        Memory.is_archived == False,
+                        Memory.is_archived.is_(False),
                     )
                 )
                 .order_by(Memory.importance.desc(), Memory.last_accessed.desc())
@@ -518,7 +518,7 @@ class MemoryRepository:
                 select(Memory)
                 .where(
                     and_(
-                        Memory.user_id == user_id, Memory.is_archived == False, or_(*tag_conditions)
+                        Memory.user_id == user_id, Memory.is_archived.is_(False), or_(*tag_conditions)
                     )
                 )
                 .order_by(Memory.importance.desc(), Memory.created_at.desc())
@@ -665,7 +665,7 @@ class MemoryRepository:
                     and_(
                         Memory.expires_at <= cutoff_time,
                         Memory.expires_at > datetime.utcnow(),
-                        Memory.is_archived == False,
+                        Memory.is_archived.is_(False),
                     )
                 )
                 .order_by(Memory.expires_at.asc())
@@ -711,7 +711,7 @@ class MemoryRepository:
                     and_(
                         Memory.source_type == source_type,
                         Memory.source_id == source_id,
-                        not Memory.is_archived,
+                        Memory.is_archived.is_(False),
                     )
                 )
                 .order_by(Memory.created_at.desc())
@@ -850,9 +850,9 @@ class MemoryRepository:
 
             # Fetch related memories
             if related_ids:
-                stmt = select(Memory).where(Memory.id.in_(related_ids))
-                result = await self.db.execute(stmt)
-                return list(result.scalars().all())
+                memory_stmt = select(Memory).where(Memory.id.in_(related_ids))
+                memory_result = await self.db.execute(memory_stmt)
+                return list(memory_result.scalars().all())
 
             return []
         except SQLAlchemyError as e:
@@ -913,7 +913,7 @@ class MemoryRepository:
             # In a production system, you might want to use a graph database
             # or implement a more efficient traversal algorithm
 
-            graph = {"nodes": {}, "edges": [], "starting_memory": str(memory_id)}
+            graph: Dict[str, Any] = {"nodes": {}, "edges": [], "starting_memory": str(memory_id)}
 
             # Get the starting memory
             start_memory = await self.get_by_id(memory_id)
