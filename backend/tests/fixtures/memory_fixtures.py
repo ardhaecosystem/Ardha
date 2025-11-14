@@ -184,7 +184,6 @@ def mock_redis():
     """Mock Redis client for testing"""
     from unittest.mock import AsyncMock, MagicMock
 
-
     redis_mock = MagicMock()
     redis_mock.get = AsyncMock(return_value=None)
     redis_mock.setex = AsyncMock()

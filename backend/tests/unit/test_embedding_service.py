@@ -10,11 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import numpy as np
 import pytest
 
-from ardha.services.embedding_service import (
-    EmbeddingError,
-    LocalEmbeddingService,
-    ModelLoadError,
-)
+from ardha.services.embedding_service import EmbeddingError, LocalEmbeddingService, ModelLoadError
 
 
 @pytest.mark.asyncio
