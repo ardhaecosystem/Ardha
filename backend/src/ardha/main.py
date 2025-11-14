@@ -6,7 +6,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-from ardha.api.v1.routes import auth, chats, milestones, oauth, projects, tasks, task_generation, websocket, workflows
+from ardha.api.v1.routes import (
+    auth,
+    chats,
+    memories,
+    milestones,
+    oauth,
+    projects,
+    task_generation,
+    tasks,
+    websocket,
+    workflows,
+)
 from ardha.core.config import settings
 
 
@@ -18,7 +29,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         debug=settings.debug,
     )
-    
+
     # Configure CORS
     app.add_middleware(
         CORSMiddleware,
@@ -27,13 +38,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     # Add trusted host middleware for WebSocket support
-    app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=["localhost", "127.0.0.1", "*"]
-    )
-    
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "*"])
+
     # Include API routers
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(oauth.router, prefix="/api/v1")
@@ -41,16 +49,17 @@ def create_app() -> FastAPI:
     app.include_router(milestones.router, prefix="/api/v1/milestones")
     app.include_router(tasks.router, prefix="/api/v1")
     app.include_router(chats.router, prefix="/api/v1")
+    app.include_router(memories.router, prefix="/api/v1")
     app.include_router(websocket.router, prefix="/api/v1")
     app.include_router(task_generation.router, prefix="/api/v1")
     app.include_router(workflows.router, prefix="/api/v1")
-    
+
     # Health check endpoint
     @app.get("/health")
     async def health_check():
         """Health check endpoint."""
         return {"status": "healthy", "service": "ardha-backend"}
-    
+
     # Root endpoint
     @app.get("/")
     async def root():
@@ -60,7 +69,7 @@ def create_app() -> FastAPI:
             "version": "0.1.0",
             "environment": settings.app_env,
         }
-    
+
     return app
 
 
@@ -70,10 +79,10 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "ardha.main:app",
-        host="0.0.0.0",
+        host="127.0.0.1",  # Use localhost instead of 0.0.0.0 for security
         port=8000,
         reload=settings.debug,
         log_level=settings.log_level.lower(),
