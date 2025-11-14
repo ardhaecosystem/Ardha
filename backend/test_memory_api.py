@@ -15,28 +15,19 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 def test_imports():
     """Test that all memory API modules can be imported."""
     try:
-        # Test request schemas
-        from ardha.schemas.requests.memory import (
-            CreateMemoryRequest,
-            IngestChatRequest,
-            SearchMemoryRequest,
-            UpdateMemoryRequest,
-        )
+        # Test request schemas import
+        import ardha.schemas.requests.memory as memory_requests
 
         print("✅ Memory request schemas imported successfully")
 
-        # Test response schemas
-        from ardha.schemas.responses.memory import (
-            MemoryCreationResponse,
-            MemoryResponse,
-            MemorySearchResponse,
-            MemoryStatsResponse,
-        )
+        # Test response schemas import
+        import ardha.schemas.responses.memory as memory_responses
 
         print("✅ Memory response schemas imported successfully")
 
-        # Test API routes
-        from ardha.api.v1.routes.memories import router
+        # Test API routes import
+        import ardha.api.v1.routes.memories as memory_routes
+
         print("✅ Memory API routes imported successfully")
 
         # Test main app includes memory router

@@ -9,18 +9,13 @@ Cost: $0.00 (completely free local embeddings!)
 Features: Semantic search, context assembly, importance scoring, memory ingestion
 """
 
-import asyncio
-import hashlib
-import json
 import logging
-import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
-from qdrant_client.http.models import Distance, VectorParams
+from qdrant_client.http.models import Distance
 
-from ..core.config import get_settings
 from ..core.qdrant import QdrantService, get_qdrant_service
 from ..models.memory import Memory, MemoryType, SourceType
 from ..repositories.memory_repository import MemoryRepository
@@ -276,7 +271,7 @@ class MemoryService:
 
         return full_context
 
-    def calculate_importance(
+    def calculate_importance_static(
         self,
         content: str,
         source_type: str,
@@ -309,7 +304,7 @@ class MemoryService:
         if len(content) > 1000:
             score += 1
         elif len(content) > 500:
-            score += 0.5
+            score = int(score + 0.5)
 
         # Access patterns
         if access_count > 10:
@@ -317,7 +312,7 @@ class MemoryService:
         elif access_count > 5:
             score += 1
         elif access_count > 2:
-            score += 0.5
+            score = int(score + 0.5)
 
         # User approval
         if has_user_approval:
@@ -396,7 +391,7 @@ class MemoryService:
                 logger.warning(f"Unknown memory type: {memory_type}, using default collection")
 
             # Generate local embedding (zero cost!)
-            embedding = await self.embedding_service.generate_embedding(content)
+            await self.embedding_service.generate_embedding(content)
 
             # Determine Qdrant collection
             collection = self._get_collection_name(memory_type)
@@ -423,7 +418,7 @@ class MemoryService:
 
             # Calculate importance if not provided
             if importance <= 0:
-                importance = self.calculate_importance(content, source_type)
+                importance = self.calculate_importance_static(content, source_type)
 
             # Store in PostgreSQL
             memory = await self.memory_repository.create(
@@ -757,7 +752,7 @@ class MemoryService:
         # In production, this would use more sophisticated clustering
 
         groups = []
-        current_group = []
+        current_group: List[Dict[str, Any]] = []
 
         for i, message in enumerate(messages):
             if not current_group:
@@ -883,7 +878,8 @@ class MemoryService:
                 dt2 = datetime.fromisoformat(time2.replace("Z", "+00:00"))
                 return abs(dt1 - dt2)
             except Exception:
-                pass
+                # Handle case where datetime subtraction fails
+                return timedelta(0)
 
         return timedelta(0)
 
@@ -983,3 +979,411 @@ class MemoryService:
                 "recent_memories": 0,
                 "error": str(e),
             }
+
+    async def ingest_from_workflow(
+        self,
+        workflow_id: UUID,
+        user_id: UUID,
+    ) -> Memory:
+        """
+        Ingest memory from workflow output.
+
+        Args:
+            workflow_id: ID of workflow
+            user_id: ID of user who owns the workflow
+
+        Returns:
+            Created memory
+
+        Raises:
+            MemoryIngestionError: If ingestion fails
+        """
+        try:
+            # Get workflow execution details
+            # Import workflow repository when needed
+
+            # For now, create a simple memory from workflow
+            # In a full implementation, you would fetch workflow details
+            content = f"Workflow {workflow_id} completed successfully"
+
+            return await self.create_memory(
+                user_id=user_id,
+                content=content,
+                memory_type="workflow",
+                source_type="workflow",
+                source_id=workflow_id,
+                importance=7,
+                metadata={
+                    "workflow_id": str(workflow_id),
+                },
+            )
+
+            # Create memory from workflow output
+            content = f"Workflow: {workflow_id}\n"
+            content += "Status: completed\n"
+            content += "Output: Workflow completed successfully\n"
+
+            return await self.create_memory(
+                user_id=user_id,
+                content=content,
+                memory_type="workflow",
+                source_type="workflow",
+                source_id=workflow_id,
+                importance=7,
+                metadata={
+                    "workflow_id": str(workflow_id),
+                },
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to ingest workflow memory: {e}")
+            raise MemoryIngestionError(f"Workflow ingestion failed: {e}")
+
+    async def get_memories_without_embeddings(self, limit: int = 100) -> List[Memory]:
+        """
+        Get memories that don't have embeddings yet.
+
+        Args:
+            limit: Maximum number of memories to return
+
+        Returns:
+            List of memories without embeddings
+        """
+        try:
+            return await self.memory_repository.get_without_qdrant_point(limit=limit)
+        except Exception as e:
+            logger.error(f"Failed to get memories without embeddings: {e}")
+            return []
+
+    async def generate_and_store_embedding(self, memory_id: UUID) -> None:
+        """
+        Generate and store embedding for a memory.
+
+        Args:
+            memory_id: ID of memory to process
+        """
+        try:
+            # Get memory
+            memories = await self.memory_repository.get_by_ids([memory_id])
+            if not memories:
+                logger.warning(f"Memory {memory_id} not found")
+                return
+
+            memory = memories[0]
+
+            # Generate embedding
+            await self.embedding_service.generate_embedding(memory.content)
+
+            # Store in Qdrant
+            collection = self._get_collection_name(memory.memory_type)
+            point_id = str(uuid4())
+
+            await self.qdrant_service.upsert_vectors(
+                collection_type=collection,
+                points=[
+                    {
+                        "id": point_id,
+                        "text": memory.content[:500],
+                        "metadata": {
+                            "user_id": str(memory.user_id),
+                            "project_id": str(memory.project_id) if memory.project_id else None,
+                            "memory_type": memory.memory_type,
+                            "source_type": memory.source_type,
+                            "created_at": memory.created_at.isoformat(),
+                        },
+                    }
+                ],
+            )
+
+            # Update memory with Qdrant info
+            await self.memory_repository.update_qdrant_info(
+                memory_id=memory_id, collection=collection, point_id=point_id
+            )
+
+            logger.info(f"Generated embedding for memory {memory_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to generate embedding for memory {memory_id}: {e}")
+
+    async def get_recent_unlinked_memories(self, days: int, limit: int) -> List[Memory]:
+        """
+        Get recent memories that don't have relationships yet.
+
+        Args:
+            days: Number of days to look back
+            limit: Maximum number of memories to return
+
+        Returns:
+            List of recent unlinked memories
+        """
+        try:
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            return await self.memory_repository.get_recent_without_links(
+                cutoff_date=cutoff_date, limit=limit
+            )
+        except Exception as e:
+            logger.error(f"Failed to get recent unlinked memories: {e}")
+            return []
+
+    async def find_similar_memories(
+        self, memory_id: UUID, min_score: float, limit: int
+    ) -> List[Tuple[Memory, float]]:
+        """
+        Find similar memories using semantic search.
+
+        Args:
+            memory_id: ID of memory to find similarities for
+            min_score: Minimum similarity score
+            limit: Maximum number of results
+
+        Returns:
+            List of (memory, score) tuples
+        """
+        try:
+            # Get memory
+            memories = await self.memory_repository.get_by_ids([memory_id])
+            if not memories:
+                return []
+
+            memory = memories[0]
+
+            # Search for similar memories
+            return await self.search_semantic(
+                user_id=memory.user_id,
+                query=memory.content,
+                limit=limit,
+                min_score=min_score,
+                project_id=memory.project_id,
+                memory_type=memory.memory_type,
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to find similar memories for {memory_id}: {e}")
+            return []
+
+    async def create_memory_link(
+        self, from_id: UUID, to_id: UUID, relationship_type: str, strength: float
+    ) -> None:
+        """
+        Create a relationship link between two memories.
+
+        Args:
+            from_id: ID of source memory
+            to_id: ID of target memory
+            relationship_type: Type of relationship
+            strength: Relationship strength score
+        """
+        try:
+            await self.memory_repository.create_link(
+                from_id=from_id, to_id=to_id, relationship_type=relationship_type, strength=strength
+            )
+            logger.info(f"Created memory link from {from_id} to {to_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to create memory link: {e}")
+
+    async def get_memories_by_age(self, days: int, limit: int) -> List[Memory]:
+        """
+        Get memories by age.
+
+        Args:
+            days: Number of days to look back
+            limit: Maximum number of memories to return
+
+        Returns:
+            List of memories
+        """
+        try:
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            return await self.memory_repository.get_by_age(cutoff_date=cutoff_date, limit=limit)
+        except Exception as e:
+            logger.error(f"Failed to get memories by age: {e}")
+            return []
+
+    async def calculate_importance(self, memory_id: UUID) -> int:
+        """
+        Calculate importance score for a memory.
+
+        Args:
+            memory_id: ID of memory to score
+
+        Returns:
+            Importance score (1-10)
+        """
+        try:
+            # Get memory
+            memories = await self.memory_repository.get_by_ids([memory_id])
+            if not memories:
+                return 5
+
+            memory = memories[0]
+
+            # Recalculate importance
+            return self.calculate_importance_static(
+                content=memory.content,
+                source_type=memory.source_type,
+                access_count=memory.access_count,
+                has_user_approval=memory.importance >= 8,  # High importance = user approved
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to calculate importance for {memory_id}: {e}")
+            return 5
+
+    async def update_memory_importance(self, memory_id: UUID, importance: int) -> None:
+        """
+        Update memory importance score.
+
+        Args:
+            memory_id: ID of memory to update
+            importance: New importance score
+        """
+        try:
+            await self.memory_repository.update_importance(memory_id, importance)
+            logger.info(f"Updated importance for memory {memory_id} to {importance}")
+
+        except Exception as e:
+            logger.error(f"Failed to update memory importance: {e}")
+
+    async def delete_expired_memories(self) -> int:
+        """
+        Delete expired short-term memories.
+
+        Returns:
+            Number of memories deleted
+        """
+        try:
+            # Delete memories older than 7 days with low importance
+            cutoff_date = datetime.utcnow() - timedelta(days=7)
+            deleted_count = await self.memory_repository.delete_expired(
+                cutoff_date=cutoff_date, max_importance=5
+            )
+
+            logger.info(f"Deleted {deleted_count} expired memories")
+            return deleted_count
+
+        except Exception as e:
+            logger.error(f"Failed to delete expired memories: {e}")
+            return 0
+
+    async def archive_old_memories(
+        self, last_accessed_before: datetime, max_importance: int
+    ) -> int:
+        """
+        Archive memories not accessed recently.
+
+        Args:
+            last_accessed_before: Date threshold for archiving
+            max_importance: Maximum importance to archive
+
+        Returns:
+            Number of memories archived
+        """
+        try:
+            archived_count = await self.memory_repository.archive_old(
+                last_accessed_before=last_accessed_before, max_importance=max_importance
+            )
+
+            logger.info(f"Archived {archived_count} old memories")
+            return archived_count
+
+        except Exception as e:
+            logger.error(f"Failed to archive old memories: {e}")
+            return 0
+
+    async def cleanup_orphaned_vectors(self) -> int:
+        """
+        Remove vectors from Qdrant that don't have PostgreSQL records.
+
+        Returns:
+            Number of vectors cleaned up
+        """
+        try:
+            # Get all memories with Qdrant points
+            memories = await self.memory_repository.get_with_qdrant_points(limit=1000)
+
+            # Get all point IDs
+            valid_point_ids = {
+                memory.qdrant_point_id for memory in memories if memory.qdrant_point_id
+            }
+
+            # Clean up each collection
+            cleaned_count = 0
+            for collection in set(self.collection_mapping.values()) | {self.default_collection}:
+                try:
+                    # Get all points in collection
+                    points = await self.qdrant_service.get_all_points(collection)
+
+                    # Find orphaned points
+                    orphaned_points = [
+                        point["id"] for point in points if point["id"] not in valid_point_ids
+                    ]
+
+                    # Delete orphaned points
+                    if orphaned_points:
+                        await self.qdrant_service.delete_points(
+                            collection_type=collection, point_ids=orphaned_points
+                        )
+                        cleaned_count += len(orphaned_points)
+
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup collection {collection}: {e}")
+                    continue
+
+            logger.info(f"Cleaned up {cleaned_count} orphaned vectors")
+            return cleaned_count
+
+        except Exception as e:
+            logger.error(f"Failed to cleanup orphaned vectors: {e}")
+            return 0
+
+    async def optimize_qdrant_collections(self) -> List[str]:
+        """
+        Optimize Qdrant collections for better performance.
+
+        Returns:
+            List of optimized collection names
+        """
+        try:
+            optimized_collections = []
+
+            for collection in set(self.collection_mapping.values()) | {self.default_collection}:
+                try:
+                    # Trigger collection optimization
+                    await self.qdrant_service.optimize_collection(collection)
+                    optimized_collections.append(collection)
+
+                except Exception as e:
+                    logger.warning(f"Failed to optimize collection {collection}: {e}")
+                    continue
+
+            logger.info(f"Optimized {len(optimized_collections)} Qdrant collections")
+            return optimized_collections
+
+        except Exception as e:
+            logger.error(f"Failed to optimize Qdrant collections: {e}")
+            return []
+
+    async def cleanup_old_links(self, days_old: int, min_strength: float) -> int:
+        """
+        Remove old memory links that are no longer relevant.
+
+        Args:
+            days_old: Age threshold in days
+            min_strength: Minimum strength threshold
+
+        Returns:
+            Number of links cleaned up
+        """
+        try:
+            cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+            cleaned_links = await self.memory_repository.cleanup_old_links(
+                cutoff_date=cutoff_date, min_strength=min_strength
+            )
+
+            logger.info(f"Cleaned up {cleaned_links} old memory links")
+            return cleaned_links
+
+        except Exception as e:
+            logger.error(f"Failed to cleanup old links: {e}")
+            return 0

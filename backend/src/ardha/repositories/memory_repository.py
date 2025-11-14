@@ -518,7 +518,9 @@ class MemoryRepository:
                 select(Memory)
                 .where(
                     and_(
-                        Memory.user_id == user_id, Memory.is_archived.is_(False), or_(*tag_conditions)
+                        Memory.user_id == user_id,
+                        Memory.is_archived.is_(False),
+                        or_(*tag_conditions),
                     )
                 )
                 .order_by(Memory.importance.desc(), Memory.created_at.desc())
@@ -966,4 +968,281 @@ class MemoryRepository:
             return graph
         except SQLAlchemyError as e:
             logger.error(f"Error getting memory graph for {memory_id}: {e}", exc_info=True)
+            raise
+
+    # Additional methods for Celery jobs
+
+    async def get_without_qdrant_point(self, limit: int = 100) -> List[Memory]:
+        """
+        Get memories that don't have Qdrant point IDs yet.
+
+        Args:
+            limit: Maximum number of memories to return
+
+        Returns:
+            List of memories without Qdrant points
+        """
+        try:
+            stmt = (
+                select(Memory)
+                .where(
+                    and_(
+                        Memory.qdrant_point_id.is_(None),
+                        Memory.is_archived.is_(False),
+                    )
+                )
+                .order_by(Memory.created_at.desc())
+                .limit(limit)
+            )
+
+            result = await self.db.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting memories without Qdrant points: {e}", exc_info=True)
+            raise
+
+    async def get_by_ids(self, memory_ids: List[UUID]) -> List[Memory]:
+        """
+        Get memories by their IDs.
+
+        Args:
+            memory_ids: List of memory IDs to fetch
+
+        Returns:
+            List of Memory objects
+        """
+        try:
+            stmt = (
+                select(Memory).where(Memory.id.in_(memory_ids)).order_by(Memory.created_at.desc())
+            )
+
+            result = await self.db.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting memories by IDs: {e}", exc_info=True)
+            raise
+
+    async def update_qdrant_info(
+        self, memory_id: UUID, collection: str, point_id: str
+    ) -> Optional[Memory]:
+        """
+        Update Qdrant collection and point ID for a memory.
+
+        Args:
+            memory_id: UUID of memory to update
+            collection: Qdrant collection name
+            point_id: Qdrant point ID
+
+        Returns:
+            Updated Memory object if found, None otherwise
+        """
+        try:
+            memory = await self.get_by_id(memory_id)
+            if not memory:
+                return None
+
+            memory.qdrant_collection = collection
+            memory.qdrant_point_id = point_id
+
+            await self.db.flush()
+            await self.db.refresh(memory)
+
+            return memory
+        except SQLAlchemyError as e:
+            logger.error(f"Error updating Qdrant info for memory {memory_id}: {e}", exc_info=True)
+            raise
+
+    async def get_recent_without_links(self, cutoff_date: datetime, limit: int) -> List[Memory]:
+        """
+        Get recent memories that don't have relationships yet.
+
+        Args:
+            cutoff_date: Date cutoff for recent memories
+            limit: Maximum number of memories to return
+
+        Returns:
+            List of recent memories without links
+        """
+        try:
+            # Get memories that don't appear in any MemoryLink
+            stmt = (
+                select(Memory)
+                .where(
+                    and_(
+                        Memory.created_at >= cutoff_date,
+                        Memory.is_archived.is_(False),
+                        ~Memory.id.in_(
+                            select(MemoryLink.memory_from_id).union(select(MemoryLink.memory_to_id))
+                        ),
+                    )
+                )
+                .order_by(Memory.created_at.desc())
+                .limit(limit)
+            )
+
+            result = await self.db.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting recent memories without links: {e}", exc_info=True)
+            raise
+
+    async def get_by_age(self, cutoff_date: datetime, limit: int) -> List[Memory]:
+        """
+        Get memories by age (created before cutoff date).
+
+        Args:
+            cutoff_date: Date cutoff for memories
+            limit: Maximum number of memories to return
+
+        Returns:
+            List of memories
+        """
+        try:
+            stmt = (
+                select(Memory)
+                .where(
+                    and_(
+                        Memory.created_at >= cutoff_date,
+                        Memory.is_archived.is_(False),
+                    )
+                )
+                .order_by(Memory.created_at.desc())
+                .limit(limit)
+            )
+
+            result = await self.db.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting memories by age: {e}", exc_info=True)
+            raise
+
+    async def delete_expired(self, cutoff_date: datetime, max_importance: int) -> int:
+        """
+        Delete expired memories with low importance.
+
+        Args:
+            cutoff_date: Date cutoff for expiration
+            max_importance: Maximum importance to delete
+
+        Returns:
+            Number of memories deleted
+        """
+        try:
+            stmt = select(Memory).where(
+                and_(
+                    Memory.created_at <= cutoff_date,
+                    Memory.importance <= max_importance,
+                    Memory.is_archived.is_(False),
+                )
+            )
+
+            result = await self.db.execute(stmt)
+            memories_to_delete = list(result.scalars().all())
+
+            deleted_count = 0
+            for memory in memories_to_delete:
+                await self.db.delete(memory)
+                deleted_count += 1
+
+            await self.db.flush()
+
+            logger.info(f"Deleted {deleted_count} expired memories")
+            return deleted_count
+        except SQLAlchemyError as e:
+            logger.error(f"Error deleting expired memories: {e}", exc_info=True)
+            raise
+
+    async def archive_old(self, last_accessed_before: datetime, max_importance: int) -> int:
+        """
+        Archive old memories with low importance.
+
+        Args:
+            last_accessed_before: Date cutoff for last access
+            max_importance: Maximum importance to archive
+
+        Returns:
+            Number of memories archived
+        """
+        try:
+            stmt = select(Memory).where(
+                and_(
+                    Memory.last_accessed <= last_accessed_before,
+                    Memory.importance <= max_importance,
+                    Memory.is_archived.is_(False),
+                )
+            )
+
+            result = await self.db.execute(stmt)
+            memories_to_archive = list(result.scalars().all())
+
+            archived_count = 0
+            for memory in memories_to_archive:
+                memory.is_archived = True
+                archived_count += 1
+
+            await self.db.flush()
+
+            logger.info(f"Archived {archived_count} old memories")
+            return archived_count
+        except SQLAlchemyError as e:
+            logger.error(f"Error archiving old memories: {e}", exc_info=True)
+            raise
+
+    async def get_with_qdrant_points(self, limit: int = 1000) -> List[Memory]:
+        """
+        Get memories that have Qdrant point IDs.
+
+        Args:
+            limit: Maximum number of memories to return
+
+        Returns:
+            List of memories with Qdrant points
+        """
+        try:
+            stmt = (
+                select(Memory)
+                .where(Memory.qdrant_point_id.isnot(None))
+                .order_by(Memory.created_at.desc())
+                .limit(limit)
+            )
+
+            result = await self.db.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting memories with Qdrant points: {e}", exc_info=True)
+            raise
+
+    async def cleanup_old_links(self, cutoff_date: datetime, min_strength: float) -> int:
+        """
+        Clean up old memory links with low strength.
+
+        Args:
+            cutoff_date: Date cutoff for link creation
+            min_strength: Minimum strength threshold
+
+        Returns:
+            Number of links cleaned up
+        """
+        try:
+            stmt = select(MemoryLink).where(
+                and_(
+                    MemoryLink.created_at <= cutoff_date,
+                    MemoryLink.strength <= min_strength,
+                )
+            )
+
+            result = await self.db.execute(stmt)
+            links_to_delete = list(result.scalars().all())
+
+            deleted_count = 0
+            for link in links_to_delete:
+                await self.db.delete(link)
+                deleted_count += 1
+
+            await self.db.flush()
+
+            logger.info(f"Cleaned up {deleted_count} old memory links")
+            return deleted_count
+        except SQLAlchemyError as e:
+            logger.error(f"Error cleaning up old links: {e}", exc_info=True)
             raise
