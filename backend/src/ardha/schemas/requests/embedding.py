@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class EmbeddingRequest(BaseModel):
     """Request schema for single text embedding."""
-    
+
     model_config = ConfigDict(
         protected_namespaces=(),  # Allow model_ fields without warnings
         validate_assignment=True,
@@ -23,24 +23,20 @@ class EmbeddingRequest(BaseModel):
                 "normalize": True,
                 "use_cache": True,
             }
-        }
+        },
     )
-    
+
     text: str = Field(
-        ...,
-        min_length=1,
-        max_length=8192,
-        description="Text to generate embedding for"
+        ..., min_length=1, max_length=8192, description="Text to generate embedding for"
     )
     normalize: Optional[bool] = Field(
         default=None,
-        description="Whether to normalize embedding (uses service default if not specified)"
+        description="Whether to normalize embedding (uses service default if not specified)",
     )
     use_cache: Optional[bool] = Field(
-        default=None,
-        description="Whether to use cache (uses service default if not specified)"
+        default=None, description="Whether to use cache (uses service default if not specified)"
     )
-    
+
     @field_validator("text")
     @classmethod
     def validate_text(cls, v: str) -> str:
@@ -52,7 +48,7 @@ class EmbeddingRequest(BaseModel):
 
 class BatchEmbeddingRequest(BaseModel):
     """Request schema for batch text embedding."""
-    
+
     model_config = ConfigDict(
         protected_namespaces=(),  # Allow model_ fields without warnings
         validate_assignment=True,
@@ -69,34 +65,29 @@ class BatchEmbeddingRequest(BaseModel):
                 "use_cache": True,
                 "show_progress": False,
             }
-        }
+        },
     )
-    
+
     texts: List[str] = Field(
-        ...,
-        min_length=1,
-        max_length=128,
-        description="List of texts to generate embeddings for"
+        ..., min_length=1, max_length=128, description="List of texts to generate embeddings for"
     )
     batch_size: Optional[int] = Field(
         default=None,
         ge=1,
         le=256,
-        description="Batch size for processing (uses service default if not specified)"
+        description="Batch size for processing (uses service default if not specified)",
     )
     normalize: Optional[bool] = Field(
         default=None,
-        description="Whether to normalize embeddings (uses service default if not specified)"
+        description="Whether to normalize embeddings (uses service default if not specified)",
     )
     use_cache: Optional[bool] = Field(
-        default=None,
-        description="Whether to use cache (uses service default if not specified)"
+        default=None, description="Whether to use cache (uses service default if not specified)"
     )
     show_progress: Optional[bool] = Field(
-        default=False,
-        description="Whether to show progress logging"
+        default=False, description="Whether to show progress logging"
     )
-    
+
     @field_validator("texts")
     @classmethod
     def validate_texts(cls, v: List[str]) -> List[str]:
@@ -107,7 +98,7 @@ class BatchEmbeddingRequest(BaseModel):
                 raise ValueError(f"Text at index {i} cannot be empty or whitespace only")
             validated_texts.append(text.strip())
         return validated_texts
-    
+
     @field_validator("batch_size")
     @classmethod
     def validate_batch_size(cls, v: Optional[int], info) -> Optional[int]:
@@ -123,7 +114,7 @@ class BatchEmbeddingRequest(BaseModel):
 
 class SimilaritySearchRequest(BaseModel):
     """Request schema for similarity search using embeddings."""
-    
+
     model_config = ConfigDict(
         protected_namespaces=(),  # Allow model_ fields without warnings
         validate_assignment=True,
@@ -139,36 +130,26 @@ class SimilaritySearchRequest(BaseModel):
                     "project_id": "456e7890-e12b-34d5-a678-123456789012",
                 },
             }
-        }
+        },
     )
-    
+
     query_text: str = Field(
         ...,
         min_length=1,
         max_length=8192,
-        description="Query text to search for similar embeddings"
+        description="Query text to search for similar embeddings",
     )
     collection_type: str = Field(
-        default="chats",
-        description="Collection type to search in (chats, projects, code, etc.)"
+        default="chats", description="Collection type to search in (chats, projects, code, etc.)"
     )
-    limit: int = Field(
-        default=10,
-        ge=1,
-        le=100,
-        description="Maximum number of results to return"
-    )
+    limit: int = Field(default=10, ge=1, le=100, description="Maximum number of results to return")
     score_threshold: float = Field(
-        default=0.7,
-        ge=0.0,
-        le=1.0,
-        description="Minimum similarity score threshold"
+        default=0.7, ge=0.0, le=1.0, description="Minimum similarity score threshold"
     )
     filter_conditions: Optional[dict] = Field(
-        default=None,
-        description="Optional metadata filter conditions"
+        default=None, description="Optional metadata filter conditions"
     )
-    
+
     @field_validator("query_text")
     @classmethod
     def validate_query_text(cls, v: str) -> str:
@@ -176,7 +157,7 @@ class SimilaritySearchRequest(BaseModel):
         if not v or not v.strip():
             raise ValueError("Query text cannot be empty or whitespace only")
         return v.strip()
-    
+
     @field_validator("collection_type")
     @classmethod
     def validate_collection_type(cls, v: str) -> str:
@@ -192,7 +173,7 @@ class SimilaritySearchRequest(BaseModel):
 
 class CacheManagementRequest(BaseModel):
     """Request schema for cache management operations."""
-    
+
     model_config = ConfigDict(
         protected_namespaces=(),  # Allow model_ fields without warnings
         validate_assignment=True,
@@ -202,18 +183,15 @@ class CacheManagementRequest(BaseModel):
                 "operation": "clear",
                 "collection_type": "chats",
             }
-        }
+        },
     )
-    
-    operation: str = Field(
-        ...,
-        description="Cache operation: clear, info, stats"
-    )
+
+    operation: str = Field(..., description="Cache operation: clear, info, stats")
     collection_type: Optional[str] = Field(
         default=None,
-        description="Optional collection type to target (if not specified, applies to all)"
+        description="Optional collection type to target (if not specified, applies to all)",
     )
-    
+
     @field_validator("operation")
     @classmethod
     def validate_operation(cls, v: str) -> str:
@@ -229,7 +207,7 @@ class CacheManagementRequest(BaseModel):
 
 class EmbeddingHealthRequest(BaseModel):
     """Request schema for embedding service health check."""
-    
+
     model_config = ConfigDict(
         protected_namespaces=(),  # Allow model_ fields without warnings
         validate_assignment=True,
@@ -239,14 +217,12 @@ class EmbeddingHealthRequest(BaseModel):
                 "include_model_test": True,
                 "include_cache_test": True,
             }
-        }
+        },
     )
-    
+
     include_model_test: bool = Field(
-        default=True,
-        description="Whether to include model test in health check"
+        default=True, description="Whether to include model test in health check"
     )
     include_cache_test: bool = Field(
-        default=True,
-        description="Whether to include cache test in health check"
+        default=True, description="Whether to include cache test in health check"
     )
