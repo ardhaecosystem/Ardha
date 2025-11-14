@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from sqlalchemy import and_, asc, desc, func, or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -512,7 +512,7 @@ class MemoryRepository:
             # Build JSON query for tags containment
             tag_conditions = []
             for tag in tags:
-                tag_conditions.append(Memory.tags[tag].astext != None)
+                tag_conditions.append(Memory.tags[tag].isnot(None))
 
             stmt = (
                 select(Memory)
@@ -620,7 +620,7 @@ class MemoryRepository:
             cutoff_time = datetime.utcnow() - timedelta(hours=hours)
 
             stmt = select(Memory).where(
-                and_(Memory.expires_at <= cutoff_time, Memory.expires_at != None)
+                and_(Memory.expires_at <= cutoff_time, Memory.expires_at.isnot(None))
             )
 
             result = await self.db.execute(stmt)
@@ -920,7 +920,7 @@ class MemoryRepository:
             if not start_memory:
                 return graph
 
-            graph["nodes"][str(memory_id)] = {
+            graph["nodes"][str(memory_id)] = {  # type: ignore
                 "id": str(memory_id),
                 "summary": start_memory.summary,
                 "memory_type": start_memory.memory_type,
@@ -942,7 +942,7 @@ class MemoryRepository:
                             visited.add(related_memory.id)
                             next_level.add(related_memory.id)
 
-                            graph["nodes"][str(related_memory.id)] = {
+                            graph["nodes"][str(related_memory.id)] = {  # type: ignore
                                 "id": str(related_memory.id),
                                 "summary": related_memory.summary,
                                 "memory_type": related_memory.memory_type,
