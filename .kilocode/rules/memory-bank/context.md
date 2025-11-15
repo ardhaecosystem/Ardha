@@ -2,8 +2,8 @@
 
 **Last Updated:** November 15, 2025
 **Current Branch:** `feature/initial-setup`
-**Active Phase:** Phase 2 - AI Features Implementation (Week 6) ✅ COMPLETE!
-**Next Phase:** Phase 3 - OpenSpec Integration (Week 7)
+**Active Phase:** Phase 3 - OpenSpec Integration (Week 7) 🔄 IN PROGRESS
+**Next Phase:** Phase 3 - OpenSpec Service & API (Week 7-8)
 
 ## Recent Achievements
 
@@ -849,6 +849,121 @@ The complete workflow execution management system is production-ready with compr
 ```
 
 ##
+### Session 22 - Phase 3 OpenSpec Repository Layer COMPLETE! (November 15, 2025) ✅
+
+**OpenSpec Repository Layer - Production-Ready Data Access Implementation:**
+
+**OpenSpec Repository Implementation:**
+- ✅ Created [`backend/src/ardha/repositories/openspec.py`](../../../backend/src/ardha/repositories/openspec.py:1) (359 lines) - Complete async repository
+  - **CRUD Operations (5 methods):**
+    - create() - Create proposal with IntegrityError handling for duplicate names
+    - get_by_id() - Fetch with eager loading (project, created_by, approved_by, tasks)
+    - get_by_name() - Case-insensitive name lookup within project scope
+    - update() - Update fields with automatic updated_at timestamp
+    - delete() - Hard delete with proper cleanup and logging
+  - **List/Filter Methods (4 methods):**
+    - list_by_project() - Pagination, status filter, ordered by created_at DESC
+    - list_by_user() - User's proposals with status filtering and pagination
+    - count_by_project() - Count with optional status filter
+    - get_active_proposals() - Excludes archived and completed statuses
+  - **Status Management (1 method):**
+    - update_status() - Sets approved_by_user_id/approved_at when approved, archived_at when archived
+  - **Content Management (1 method):**
+    - update_content() - Partial updates, resets task_sync_status if tasks_content changes
+  - **Sync Tracking (1 method):**
+    - update_sync_status() - Updates sync status, last_sync_at, clears/sets error_message
+  - **Completion Calculation (1 method):**
+    - calculate_completion() - Calculates percentage from linked task statuses (done/total * 100)
+
+**Test Infrastructure:**
+- ✅ Updated [`backend/tests/conftest.py`](../../../backend/tests/conftest.py:1) - Added OpenSpec test fixtures
+  - openspec_dependencies - Async fixture creates User and Project for foreign key validation
+  - sample_proposal_data - Complete proposal data with all required fields
+  - sample_proposals_batch - 5 proposals with different statuses (pending, approved, in_progress, archived, rejected)
+  - test_openspec_proposal - Database-backed proposal fixture for integration tests
+- ✅ Created [`backend/tests/fixtures/openspec_fixtures.py`](../../../backend/tests/fixtures/openspec_fixtures.py:1) (267 lines) - Reusable test data
+
+**Comprehensive Unit Tests:**
+- ✅ Created [`backend/tests/unit/test_openspec_repository.py`](../../../backend/tests/unit/test_openspec_repository.py:1) (436 lines)
+  - **35/35 tests passing (100% pass rate!)** ✅
+  - **Test Categories:**
+    - CRUD Tests (11): Create success/duplicate, get by ID/name with case-insensitivity, update, delete
+    - List/Filter Tests (6): Project lists, user lists, pagination validation, count operations
+    - Status Management Tests (3): Approved workflow with timestamps, archived workflow, active filtering
+    - Content Update Tests (3): Partial updates, sync reset when tasks change, sync preservation
+    - Sync Status Tests (3): Success updates, error messages, error clearing on success
+    - Completion Tests (3): With tasks (66%), no tasks (0%), all complete (100%)
+    - Edge Cases (6): Empty results, not found returns None, invalid pagination raises ValueError
+
+**Repository Export:**
+- ✅ Updated [`backend/src/ardha/repositories/__init__.py`](../../../backend/src/ardha/repositories/__init__.py:1)
+  - Added OpenSpecRepository to package exports
+
+**Technical Features Implemented:**
+
+**Data Access Patterns:**
+- **Eager Loading**: selectinload() prevents N+1 queries on project, created_by, approved_by, tasks relationships
+- **Pagination Validation**: Validates skip >= 0, 1 <= limit <= 100 for all list methods
+- **Case-Insensitive Search**: func.lower() for name matching across different cases
+- **Ordering**: created_at DESC for chronological listing (newest first)
+
+**Business Logic:**
+- **Smart Sync Reset**: update_content() resets task_sync_status to "not_synced" ONLY if tasks_content changes
+- **Error Clearing**: update_sync_status() clears sync_error_message when status transitions to "synced"
+- **Completion Tracking**: calculate_completion() handles zero tasks (0%), partial (66%), and complete (100%)
+- **Workflow Timestamps**: update_status() automatically sets approved_at/archived_at based on new status
+
+**Error Handling:**
+- **IntegrityError**: Caught and re-raised for unique constraint violations with detailed logging
+- **SQLAlchemyError**: Caught with full stack trace logging, returns None for not found
+- **Graceful Degradation**: All read methods return None on error instead of crashing
+- **Comprehensive Logging**: INFO for successful operations, ERROR for failures with context
+
+**Type Safety:**
+- **Full Type Hints**: All parameters typed (UUID, str, int, Optional[], list[])
+- **Optional Returns**: Proper Optional[OpenSpecProposal] for methods that may not find records
+- **List Returns**: Explicit list[OpenSpecProposal] types for collection methods
+- **UUID Handling**: Consistent UUID types throughout with proper validation
+
+**Performance Optimizations:**
+- **selectinload()**: Prevents N+1 query problems on all relationship accesses
+- **Index-Aware Queries**: Leverages project_id, status, created_at composite indexes
+- **Pagination Limits**: Max 100 records per query to prevent memory issues
+- **Efficient Counting**: Uses COUNT() aggregates without loading full objects
+
+**Validation Results:**
+```bash
+✅ OpenSpecRepository imports successfully
+✅ 35/35 unit tests passing (100% pass rate)
+✅ Async patterns throughout with proper session management
+✅ Proper relationship loading with no N+1 queries
+✅ Error handling comprehensive with detailed logging
+✅ Type safety validated with no Pylance errors
+✅ All CRUD operations working correctly
+✅ Status workflow management functional
+✅ Content updates with smart sync reset logic
+✅ Completion calculation accurate (0%, 66%, 100% scenarios)
+```
+
+**Business Value:**
+1. **Clean Data Access**: Complete separation of concerns with repository pattern
+2. **High Performance**: Optimized queries with eager loading and proper indexing
+3. **Test Coverage**: 100% pass rate with 35 comprehensive tests covering all scenarios
+4. **Production Ready**: Comprehensive error handling, logging, and type safety
+5. **Maintainable**: Follows existing Ardha repository patterns, easy to extend
+6. **Integration Ready**: Clean interfaces for service layer and API endpoints
+
+**Phase 3 OpenSpec Repository Layer Status: COMPLETE! ✅**
+The complete OpenSpec repository layer is production-ready with comprehensive testing (35/35 tests passing), proper async patterns, optimized queries with eager loading, and full integration with existing Ardha database architecture. All 13 repository methods are implemented with proper validation, error handling, and business logic enforcement. Ready for OpenSpec Service Layer implementation in Week 7-8!
+
+**Files Created/Modified**: 4 core files with 1,062+ lines of production code
+**Test Coverage**: 35 comprehensive tests with 100% pass rate
+**Repository Methods**: 13 complete methods (5 CRUD + 4 list/filter + 4 management)
+**Performance**: Optimized with eager loading, pagination (max 100), and index-aware queries
+**Quality**: Production-ready with error handling, comprehensive logging, and full type safety
+
+**Status**: ✅ **COMPLETE - PRODUCTION-READY OPENSPEC REPOSITORY LAYER**
+
 
 ### Session 5 - Complete Task Management System (November 8, 2025) ✅
 

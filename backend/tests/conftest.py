@@ -444,3 +444,246 @@ def test_client(client: AsyncClient, test_user: dict) -> AsyncClient:
     # Add default authorization header
     client.headers.update({"Authorization": f"Bearer {test_user['token']}"})
     return client
+
+
+# ============= OpenSpec Fixtures =============
+
+
+@pytest_asyncio.fixture
+async def openspec_dependencies(test_db: AsyncSession):
+    """
+    Create User and Project dependencies for OpenSpec tests.
+
+    Returns:
+        Tuple of (user_id, project_id)
+    """
+    from uuid import uuid4
+
+    from ardha.models.project import Project
+    from ardha.models.user import User
+
+    # Create user
+    user_id = uuid4()
+    user = User(
+        id=user_id,
+        email="openspec@example.com",
+        username="openspecuser",
+        full_name="OpenSpec User",
+        password_hash="hashed_password",
+    )
+    test_db.add(user)
+    await test_db.flush()
+
+    # Create project
+    project_id = uuid4()
+    project = Project(
+        id=project_id,
+        name="OpenSpec Test Project",
+        slug="openspec-test-project",
+        owner_id=user_id,
+        visibility="private",
+    )
+    test_db.add(project)
+    await test_db.flush()
+
+    return user_id, project_id
+
+
+@pytest_asyncio.fixture
+async def sample_proposal_data(openspec_dependencies):
+    """
+    Sample data for creating OpenSpec proposals.
+
+    Returns:
+        Dictionary with all required proposal fields
+    """
+    from datetime import UTC, datetime
+
+    user_id, project_id = openspec_dependencies
+
+    return {
+        "project_id": project_id,
+        "name": "user-auth-system",
+        "directory_path": "openspec/changes/user-auth-system",
+        "status": "pending",
+        "created_by_user_id": user_id,
+        "proposal_content": """# User Authentication System
+
+## Summary
+Implement JWT-based authentication with OAuth support.
+
+## Motivation
+Users need secure authentication to access the platform.
+
+## Implementation Plan
+1. Create User model
+2. Implement JWT token generation
+3. Add OAuth providers (GitHub, Google)
+""",
+        "tasks_content": """# Tasks
+
+## TAS-001: Create User Model
+- Create SQLAlchemy User model
+- Add email, password_hash fields
+- Create migration
+
+## TAS-002: Implement JWT Service
+- Token generation
+- Token validation
+- Refresh token logic
+
+## TAS-003: OAuth Integration
+- GitHub OAuth flow
+- Google OAuth flow
+""",
+        "spec_delta_content": """# Specification Changes
+
+## Database Schema
+- Add `users` table
+- Add `oauth_accounts` table
+
+## API Endpoints
+- POST /api/v1/auth/register
+- POST /api/v1/auth/login
+- POST /api/v1/auth/refresh
+""",
+        "metadata_json": {
+            "proposal_id": "user-auth-system",
+            "title": "User Authentication System",
+            "author": "AI Assistant",
+            "created_at": datetime.now(UTC).isoformat(),
+            "priority": "high",
+            "estimated_effort": "3 days",
+            "tags": ["backend", "security", "authentication"],
+        },
+        "task_sync_status": "not_synced",
+        "completion_percentage": 0,
+    }
+
+
+@pytest_asyncio.fixture
+async def sample_proposals_batch(openspec_dependencies):
+    """
+    Batch of sample proposals for pagination and filtering tests.
+
+    Returns:
+        List of 5 proposal data dictionaries with different statuses
+    """
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    user_id, project_id = openspec_dependencies
+
+    return [
+        {
+            "project_id": project_id,
+            "name": "proposal-pending-1",
+            "directory_path": "openspec/changes/proposal-pending-1",
+            "status": "pending",
+            "created_by_user_id": user_id,
+            "proposal_content": "# Pending Proposal 1\n...",
+            "tasks_content": "# Tasks\n## TAS-001: Task 1\n...",
+            "spec_delta_content": "# Changes\n...",
+            "metadata_json": {"proposal_id": "proposal-pending-1", "priority": "low"},
+        },
+        {
+            "project_id": project_id,
+            "name": "proposal-approved-1",
+            "directory_path": "openspec/changes/proposal-approved-1",
+            "status": "approved",
+            "created_by_user_id": user_id,
+            "approved_by_user_id": user_id,  # Use same user as creator
+            "approved_at": datetime.now(UTC),
+            "proposal_content": "# Approved Proposal 1\n...",
+            "tasks_content": "# Tasks\n## TAS-001: Task 1\n...",
+            "spec_delta_content": "# Changes\n...",
+            "metadata_json": {"proposal_id": "proposal-approved-1", "priority": "high"},
+        },
+        {
+            "project_id": project_id,
+            "name": "proposal-in-progress",
+            "directory_path": "openspec/changes/proposal-in-progress",
+            "status": "in_progress",
+            "created_by_user_id": user_id,
+            "proposal_content": "# In Progress Proposal\n...",
+            "tasks_content": "# Tasks\n## TAS-001: Task 1\n...",
+            "spec_delta_content": "# Changes\n...",
+            "metadata_json": {"proposal_id": "proposal-in-progress", "priority": "medium"},
+            "task_sync_status": "synced",
+            "completion_percentage": 50,
+        },
+        {
+            "project_id": project_id,
+            "name": "proposal-archived-1",
+            "directory_path": "openspec/archive/proposal-archived-1",
+            "status": "archived",
+            "created_by_user_id": user_id,
+            "archived_at": datetime.now(UTC),
+            "proposal_content": "# Archived Proposal 1\n...",
+            "tasks_content": "# Tasks\n## TAS-001: Task 1\n...",
+            "spec_delta_content": "# Changes\n...",
+            "metadata_json": {"proposal_id": "proposal-archived-1", "priority": "low"},
+            "completion_percentage": 100,
+        },
+        {
+            "project_id": project_id,
+            "name": "proposal-rejected",
+            "directory_path": "openspec/changes/proposal-rejected",
+            "status": "rejected",
+            "created_by_user_id": user_id,
+            "proposal_content": "# Rejected Proposal\n...",
+            "tasks_content": "# Tasks\n## TAS-001: Task 1\n...",
+            "spec_delta_content": "# Changes\n...",
+            "metadata_json": {"proposal_id": "proposal-rejected", "priority": "low"},
+        },
+    ]
+
+
+@pytest_asyncio.fixture
+async def test_openspec_proposal(
+    test_db: AsyncSession,
+    test_user: dict,
+    test_project: dict,
+) -> dict:
+    """
+    Create test OpenSpec proposal for testing.
+
+    Args:
+        test_db: Test database session
+        test_user: Authenticated test user
+        test_project: Test project
+
+    Returns:
+        Dictionary with proposal data
+    """
+    from datetime import UTC, datetime
+
+    from ardha.models.openspec import OpenSpecProposal
+
+    proposal = OpenSpecProposal(
+        project_id=test_project["id"],
+        name="test-openspec-proposal",
+        directory_path="openspec/changes/test-openspec-proposal",
+        status="pending",
+        created_by_user_id=test_user["user"]["id"],
+        proposal_content="# Test Proposal\n## Summary\nTest content",
+        tasks_content="# Tasks\n## TAS-001: Test Task\nTest task content",
+        spec_delta_content="# Changes\n- Test change",
+        metadata_json={
+            "proposal_id": "test-openspec-proposal",
+            "title": "Test Proposal",
+            "priority": "medium",
+        },
+    )
+
+    test_db.add(proposal)
+    await test_db.flush()
+    await test_db.refresh(proposal)
+
+    return {
+        "id": str(proposal.id),
+        "project_id": str(proposal.project_id),
+        "name": proposal.name,
+        "status": proposal.status,
+        "created_by_user_id": str(proposal.created_by_user_id),
+    }
