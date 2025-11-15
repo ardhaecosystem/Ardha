@@ -1,489 +1,860 @@
 """
-OpenSpec service for managing proposal generation and file operations.
+OpenSpec service for business logic.
 
-This service handles the creation, validation, and management of OpenSpec
-proposals and their associated files.
+This module orchestrates OpenSpec file parsing and database operations,
+providing business logic for proposal lifecycle management.
 """
 
 import json
 import logging
-import os
 import shutil
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-from uuid import UUID, uuid4
+from typing import Any
+from uuid import UUID
 
-from ..core.config import get_settings
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ardha.core.exceptions import (
+    OpenSpecFileNotFoundError,
+    OpenSpecParseError,
+    OpenSpecValidationError,
+)
+from ardha.models.openspec import OpenSpecProposal
+from ardha.models.task import Task
+from ardha.repositories.openspec import OpenSpecRepository
+from ardha.services.openspec_parser import OpenSpecParserService
+from ardha.services.project_service import ProjectService
+from ardha.services.task_service import TaskService
 
 logger = logging.getLogger(__name__)
 
 
+# ============= Custom Exceptions =============
+
+
+class OpenSpecProposalNotFoundError(Exception):
+    """Raised when an OpenSpec proposal is not found."""
+
+    pass
+
+
+class OpenSpecProposalExistsError(Exception):
+    """Raised when a proposal with the same name already exists."""
+
+    pass
+
+
+class InsufficientOpenSpecPermissionsError(Exception):
+    """Raised when user lacks permissions for OpenSpec operation."""
+
+    pass
+
+
+class ProposalNotEditableError(Exception):
+    """Raised when attempting to edit a non-editable proposal."""
+
+    pass
+
+
+class ProposalNotApprovableError(Exception):
+    """Raised when attempting to approve a proposal that can't be approved."""
+
+    pass
+
+
+class TaskSyncError(Exception):
+    """Raised when task synchronization fails."""
+
+    pass
+
+
 class OpenSpecService:
     """
-    Service for managing OpenSpec proposals and file operations.
+    Service layer for OpenSpec business logic.
 
-    Handles creation of proposal directories, file generation, validation,
-    and archival of OpenSpec proposals.
+    Orchestrates:
+    - File system parsing via OpenSpecParserService
+    - Database operations via OpenSpecRepository
+    - Task synchronization via TaskService
+    - Permission checks via ProjectService
+    - Proposal lifecycle management
     """
 
-    def __init__(self, base_path: Optional[str] = None):
+    def __init__(
+        self,
+        openspec_repo: OpenSpecRepository,
+        parser: OpenSpecParserService,
+        task_service: TaskService,
+        project_service: ProjectService,
+        db: AsyncSession,
+    ):
         """
         Initialize OpenSpec service.
 
         Args:
-            base_path: Base path for OpenSpec directory (optional)
+            openspec_repo: Repository for database operations
+            parser: Parser for file system operations
+            task_service: Service for task operations
+            project_service: Service for project operations
+            db: Async database session
         """
-        self.settings = get_settings()
-        # Use current working directory as base if not provided
-        project_root = Path.cwd().parent if base_path is None else Path(base_path)
-        self.base_path = project_root / "openspec"
-        self.changes_path = self.base_path / "changes"
-        self.templates_path = self.base_path / "templates"
-        self.logger = logger.getChild("OpenSpecService")
+        self.repo = openspec_repo
+        self.parser = parser
+        self.task_service = task_service
+        self.project_service = project_service
+        self.db = db
 
-        # Ensure directories exist
-        self._ensure_directories()
+    # ============= Core Methods =============
 
-    def _ensure_directories(self) -> None:
-        """Ensure OpenSpec directories exist."""
-        try:
-            self.base_path.mkdir(parents=True, exist_ok=True)
-            self.changes_path.mkdir(parents=True, exist_ok=True)
-            self.templates_path.mkdir(parents=True, exist_ok=True)
-            self.logger.info("OpenSpec directories ensured")
-        except Exception as e:
-            self.logger.error(f"Failed to create OpenSpec directories: {e}")
-            raise
-
-    def create_proposal_directory(self, proposal_id: str) -> Path:
+    async def create_from_filesystem(
+        self,
+        project_id: UUID,
+        proposal_name: str,
+        user_id: UUID,
+    ) -> OpenSpecProposal:
         """
-        Create a new proposal directory.
+        Create proposal from filesystem OpenSpec directory.
 
         Args:
-            proposal_id: Unique proposal identifier
+            project_id: Project UUID
+            proposal_name: Name of proposal (directory name)
+            user_id: User creating the proposal
 
         Returns:
-            Path to created proposal directory
+            Created OpenSpecProposal
 
         Raises:
-            OSError: If directory creation fails
+            InsufficientOpenSpecPermissionsError: If user lacks permissions
+            OpenSpecProposalExistsError: If proposal name already exists
+            OpenSpecFileNotFoundError: If proposal directory not found
+            OpenSpecParseError: If parsing fails
+            OpenSpecValidationError: If validation fails
         """
-        try:
-            proposal_path = self.changes_path / proposal_id
-            proposal_path.mkdir(parents=True, exist_ok=True)
-            self.logger.info(f"Created proposal directory: {proposal_path}")
-            return proposal_path
-        except Exception as e:
-            self.logger.error(f"Failed to create proposal directory {proposal_id}: {e}")
-            raise
+        # Verify user has project member access
+        await self._verify_project_access(project_id, user_id, required_role="member")
 
-    def generate_openspec_files(
-        self, proposal_data: Dict[str, Any], proposal_id: str, change_directory_path: str
-    ) -> Dict[str, str]:
-        """
-        Generate all OpenSpec files for a proposal.
+        logger.info(f"Creating proposal '{proposal_name}' for project {project_id}")
 
-        Args:
-            proposal_data: Complete proposal data from workflow
-            proposal_id: Unique proposal identifier
-            change_directory_path: Path for change directory
-
-        Returns:
-            Dictionary mapping filenames to their file paths
-
-        Raises:
-            ValueError: If proposal data is invalid
-            OSError: If file creation fails
-        """
-        try:
-            # Create proposal directory
-            proposal_path = self.create_proposal_directory(proposal_id)
-
-            # Extract files from proposal data
-            files = proposal_data.get("files", {})
-            if not files:
-                raise ValueError("No files found in proposal data")
-
-            generated_files = {}
-
-            # Generate each file
-            for filename, content in files.items():
-                file_path = proposal_path / filename
-
-                # Validate file content
-                self._validate_file_content(filename, content, proposal_data)
-
-                # Write file
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(content)
-
-                generated_files[filename] = str(file_path)
-                self.logger.info(f"Generated OpenSpec file: {filename}")
-
-            # Generate metadata file
-            metadata_path = self._generate_metadata_file(proposal_data, proposal_id, proposal_path)
-            generated_files["metadata.json"] = str(metadata_path)
-
-            # Generate summary file
-            summary_path = self._generate_summary_file(proposal_data, proposal_id, proposal_path)
-            generated_files["summary.md"] = str(summary_path)
-
-            self.logger.info(
-                f"Generated {len(generated_files)} OpenSpec files for proposal {proposal_id}"
+        # Check if proposal already exists
+        existing = await self.repo.get_by_name(project_id, proposal_name)
+        if existing:
+            raise OpenSpecProposalExistsError(
+                f"Proposal '{proposal_name}' already exists in this project"
             )
-            return generated_files
 
-        except Exception as e:
-            self.logger.error(f"Failed to generate OpenSpec files for proposal {proposal_id}: {e}")
+        # Parse proposal from filesystem
+        try:
+            parsed = self.parser.parse_proposal(proposal_name)
+        except OpenSpecFileNotFoundError as e:
+            logger.error(f"Proposal '{proposal_name}' not found: {e}")
+            raise
+        except OpenSpecParseError as e:
+            logger.error(f"Failed to parse proposal '{proposal_name}': {e}")
             raise
 
-    def _validate_file_content(
-        self, filename: str, content: str, proposal_data: Dict[str, Any]
-    ) -> None:
+        # Validate parsed proposal
+        if not parsed.is_valid:
+            raise OpenSpecValidationError(
+                f"Proposal validation failed: {', '.join(parsed.validation_errors)}",
+                validation_errors=parsed.validation_errors,
+            )
+
+        # Create database record
+        proposal = OpenSpecProposal(
+            project_id=project_id,
+            name=parsed.name,
+            directory_path=parsed.directory_path,
+            status="pending",
+            created_by_user_id=user_id,
+            proposal_content=parsed.proposal_content,
+            tasks_content=parsed.tasks_content,
+            spec_delta_content=parsed.spec_delta_content,
+            metadata_json=parsed.metadata.model_dump() if parsed.metadata else None,
+            task_sync_status="not_synced",
+            completion_percentage=0,
+        )
+
+        try:
+            proposal = await self.repo.create(proposal)
+            await self.db.flush()
+            await self.db.refresh(proposal)
+
+            logger.info(f"Created proposal '{proposal.name}' (id={proposal.id}) from filesystem")
+            return proposal
+
+        except IntegrityError as e:
+            logger.error(f"Integrity error creating proposal: {e}")
+            raise OpenSpecProposalExistsError(
+                f"Proposal '{proposal_name}' already exists in this project"
+            )
+
+    async def get_proposal(
+        self,
+        proposal_id: UUID,
+        user_id: UUID,
+    ) -> OpenSpecProposal:
         """
-        Validate OpenSpec file content against requirements.
+        Get proposal by ID with permission check.
 
         Args:
-            filename: Name of the file
-            content: File content to validate
-            proposal_data: Complete proposal data for context
+            proposal_id: Proposal UUID
+            user_id: User requesting proposal
+
+        Returns:
+            OpenSpecProposal
 
         Raises:
-            ValueError: If content doesn't meet requirements
+            OpenSpecProposalNotFoundError: If proposal not found
+            InsufficientOpenSpecPermissionsError: If user lacks permissions
         """
-        if not content or not content.strip():
-            raise ValueError(f"File {filename} has empty content")
+        proposal = await self.repo.get_by_id(proposal_id)
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found")
 
-        # File-specific validations
-        if filename == "proposal.md":
-            self._validate_proposal_file(content, proposal_data)
-        elif filename == "tasks.md":
-            self._validate_tasks_file(content, proposal_data)
-        elif filename == "spec-delta.md":
-            self._validate_spec_delta_file(content, proposal_data)
-        elif filename == "README.md":
-            self._validate_readme_file(content, proposal_data)
-        elif filename == "risk-assessment.md":
-            self._validate_risk_assessment_file(content, proposal_data)
+        # Verify user has project viewer access
+        await self._verify_project_access(proposal.project_id, user_id, required_role="viewer")
 
-    def _validate_proposal_file(self, content: str, proposal_data: Dict[str, Any]) -> None:
-        """Validate proposal.md file content."""
-        required_sections = [
-            "# ",
-            "## Summary",
-            "## Motivation",
-            "## Implementation Plan",
-            "## Estimated Effort",
-        ]
+        return proposal
 
-        for section in required_sections:
-            if section not in content:
-                raise ValueError(f"proposal.md missing required section: {section}")
-
-        # Check if proposal data matches content
-        proposal = proposal_data.get("proposal", {})
-        if proposal.get("title") and proposal["title"] not in content:
-            raise ValueError("proposal.md title doesn't match proposal data")
-
-    def _validate_tasks_file(self, content: str, proposal_data: Dict[str, Any]) -> None:
-        """Validate tasks.md file content."""
-        required_sections = ["# Task Breakdown", "## Phase"]
-
-        for section in required_sections:
-            if section not in content:
-                raise ValueError(f"tasks.md missing required section: {section}")
-
-        # Check for task list items
-        if "- [ ]" not in content:
-            raise ValueError("tasks.md missing task list items")
-
-    def _validate_spec_delta_file(self, content: str, proposal_data: Dict[str, Any]) -> None:
-        """Validate spec-delta.md file content."""
-        required_sections = [
-            "# Specification Updates",
-            "## New Components",
-            "## Modified Components",
-        ]
-
-        for section in required_sections:
-            if section not in content:
-                raise ValueError(f"spec-delta.md missing required section: {section}")
-
-    def _validate_readme_file(self, content: str, proposal_data: Dict[str, Any]) -> None:
-        """Validate README.md file content."""
-        required_sections = ["# ", "## Setup", "## Implementation"]
-
-        for section in required_sections:
-            if section not in content:
-                raise ValueError(f"README.md missing required section: {section}")
-
-    def _validate_risk_assessment_file(self, content: str, proposal_data: Dict[str, Any]) -> None:
-        """Validate risk-assessment.md file content."""
-        required_sections = ["# Risk Assessment", "## Security Risks", "## Mitigation Strategies"]
-
-        for section in required_sections:
-            if section not in content:
-                raise ValueError(f"risk-assessment.md missing required section: {section}")
-
-    def _generate_metadata_file(
-        self, proposal_data: Dict[str, Any], proposal_id: str, proposal_path: Path
-    ) -> Path:
+    async def list_proposals(
+        self,
+        project_id: UUID,
+        user_id: UUID,
+        status: str | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[OpenSpecProposal], int]:
         """
-        Generate metadata.json file for the proposal.
+        List proposals for a project with permission check.
 
         Args:
-            proposal_data: Complete proposal data
-            proposal_id: Proposal identifier
-            proposal_path: Path to proposal directory
+            project_id: Project UUID
+            user_id: User requesting proposals
+            status: Optional status filter
+            skip: Pagination offset
+            limit: Page size
 
         Returns:
-            Path to generated metadata file
-        """
-        metadata = {
-            "proposal_id": proposal_id,
-            "generated_at": proposal_data.get("metadata", {}).get("generated_at"),
-            "workflow_id": proposal_data.get("metadata", {}).get("workflow_id"),
-            "title": proposal_data.get("proposal", {}).get("title"),
-            "description": proposal_data.get("proposal", {}).get("description"),
-            "objectives": proposal_data.get("proposal", {}).get("objectives", []),
-            "scope": proposal_data.get("proposal", {}).get("scope", {}),
-            "success_criteria": proposal_data.get("proposal", {}).get("success_criteria", []),
-            "total_tasks": proposal_data.get("metadata", {}).get("total_tasks"),
-            "estimated_effort": proposal_data.get("metadata", {}).get("estimated_effort"),
-            "quality_score": proposal_data.get("metadata", {}).get("quality_score"),
-            "files_generated": list(proposal_data.get("files", {}).keys()),
-            "change_directory_path": str(proposal_path),
-        }
-
-        metadata_path = proposal_path / "metadata.json"
-        with open(metadata_path, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
-
-        return metadata_path
-
-    def _generate_summary_file(
-        self, proposal_data: Dict[str, Any], proposal_id: str, proposal_path: Path
-    ) -> Path:
-        """
-        Generate summary.md file for the proposal.
-
-        Args:
-            proposal_data: Complete proposal data
-            proposal_id: Proposal identifier
-            proposal_path: Path to proposal directory
-
-        Returns:
-            Path to generated summary file
-        """
-        proposal = proposal_data.get("proposal", {})
-        metadata = proposal_data.get("metadata", {})
-
-        summary_content = f"""# {proposal.get('title', 'Untitled Proposal')}
-
-## Summary
-
-{proposal.get('description', 'No description available')}
-
-## Quick Facts
-
-- **Proposal ID**: {proposal_id}
-- **Generated**: {metadata.get('generated_at', 'Unknown')}
-- **Total Tasks**: {metadata.get('total_tasks', 'Unknown')}
-- **Estimated Effort**: {metadata.get('estimated_effort', 'Unknown')}
-- **Quality Score**: {metadata.get('quality_score', 'Unknown')}
-
-## Objectives
-
-"""
-
-        for i, objective in enumerate(proposal.get("objectives", []), 1):
-            summary_content += f"{i}. {objective}\n"
-
-        summary_content += f"""
-## Success Criteria
-
-"""
-
-        for i, criterion in enumerate(proposal.get("success_criteria", []), 1):
-            summary_content += f"{i}. {criterion}\n"
-
-        summary_content += f"""
-## Files Generated
-
-"""
-
-        for filename in proposal_data.get("files", {}):
-            summary_content += f"- [{filename}]({filename})\n"
-
-        summary_content += f"""
-## Next Steps
-
-1. Review all generated files
-2. Validate task breakdown and dependencies
-3. Approve or modify the proposal
-4. Begin implementation
-
----
-
-*Generated by Ardha Task Generation Workflow*
-"""
-
-        summary_path = proposal_path / "summary.md"
-        with open(summary_path, "w", encoding="utf-8") as f:
-            f.write(summary_content)
-
-        return summary_path
-
-    def get_proposal_files(self, proposal_id: str) -> Dict[str, str]:
-        """
-        Get all files for a proposal.
-
-        Args:
-            proposal_id: Proposal identifier
-
-        Returns:
-            Dictionary mapping filenames to their content
+            Tuple of (proposals list, total count)
 
         Raises:
-            FileNotFoundError: If proposal directory doesn't exist
+            InsufficientOpenSpecPermissionsError: If user lacks permissions
         """
-        proposal_path = self.changes_path / proposal_id
+        # Verify user has project viewer access
+        await self._verify_project_access(project_id, user_id, required_role="viewer")
 
-        if not proposal_path.exists():
-            raise FileNotFoundError(f"Proposal directory not found: {proposal_id}")
+        # Get proposals
+        proposals = await self.repo.list_by_project(
+            project_id=project_id,
+            status=status,
+            skip=skip,
+            limit=limit,
+        )
 
-        files = {}
+        # Get total count
+        total = await self.repo.count_by_project(project_id, status=status)
 
-        for file_path in proposal_path.rglob("*"):
-            if file_path.is_file():
-                relative_path = file_path.relative_to(proposal_path)
-                with open(file_path, "r", encoding="utf-8") as f:
-                    files[str(relative_path)] = f.read()
+        logger.debug(f"Listed {len(proposals)} proposals for project {project_id}")
+        return proposals, total
 
-        return files
+    async def update_proposal(
+        self,
+        proposal_id: UUID,
+        update_data: dict[str, Any],
+        user_id: UUID,
+    ) -> OpenSpecProposal:
+        """
+        Update proposal content.
 
-    def archive_proposal(self, proposal_id: str, reason: str = "completed") -> bool:
+        Args:
+            proposal_id: Proposal UUID
+            update_data: Fields to update
+            user_id: User updating proposal
+
+        Returns:
+            Updated OpenSpecProposal
+
+        Raises:
+            OpenSpecProposalNotFoundError: If proposal not found
+            ProposalNotEditableError: If proposal status is not pending/rejected
+            InsufficientOpenSpecPermissionsError: If user lacks permissions
+        """
+        proposal = await self.repo.get_by_id(proposal_id)
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found")
+
+        # Verify user has project member access
+        await self._verify_project_access(proposal.project_id, user_id, required_role="member")
+
+        # Verify proposal is editable
+        if not proposal.is_editable:
+            raise ProposalNotEditableError(
+                f"Proposal with status '{proposal.status}' cannot be edited. "
+                f"Only pending or rejected proposals can be updated."
+            )
+
+        # Update proposal content
+        proposal = await self.repo.update_content(
+            proposal_id=proposal_id,
+            proposal_content=update_data.get("proposal_content"),
+            tasks_content=update_data.get("tasks_content"),
+            spec_delta_content=update_data.get("spec_delta_content"),
+            metadata_json=update_data.get("metadata_json"),
+        )
+
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found after update")
+
+        await self.db.flush()
+        await self.db.refresh(proposal)
+
+        logger.info(f"Updated proposal '{proposal.name}' (id={proposal_id})")
+        return proposal
+
+    async def approve_proposal(
+        self,
+        proposal_id: UUID,
+        user_id: UUID,
+    ) -> OpenSpecProposal:
+        """
+        Approve a proposal.
+
+        Args:
+            proposal_id: Proposal UUID
+            user_id: User approving proposal
+
+        Returns:
+            Approved OpenSpecProposal
+
+        Raises:
+            OpenSpecProposalNotFoundError: If proposal not found
+            ProposalNotApprovableError: If proposal status is not pending
+            InsufficientOpenSpecPermissionsError: If user lacks admin permissions
+        """
+        proposal = await self.repo.get_by_id(proposal_id)
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found")
+
+        # Verify user has project admin access
+        await self._verify_project_access(proposal.project_id, user_id, required_role="admin")
+
+        # Verify proposal can be approved
+        if not proposal.can_approve:
+            raise ProposalNotApprovableError(
+                f"Proposal with status '{proposal.status}' cannot be approved. "
+                f"Only pending proposals can be approved."
+            )
+
+        # Update status to approved
+        proposal = await self.repo.update_status(
+            proposal_id=proposal_id,
+            new_status="approved",
+            user_id=user_id,
+        )
+
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found after approval")
+
+        await self.db.flush()
+        await self.db.refresh(proposal)
+
+        logger.info(f"Approved proposal '{proposal.name}' (id={proposal_id}) by user {user_id}")
+        return proposal
+
+    async def reject_proposal(
+        self,
+        proposal_id: UUID,
+        user_id: UUID,
+        reason: str,
+    ) -> OpenSpecProposal:
+        """
+        Reject a proposal.
+
+        Args:
+            proposal_id: Proposal UUID
+            user_id: User rejecting proposal
+            reason: Rejection reason
+
+        Returns:
+            Rejected OpenSpecProposal
+
+        Raises:
+            OpenSpecProposalNotFoundError: If proposal not found
+            InsufficientOpenSpecPermissionsError: If user lacks admin permissions
+        """
+        proposal = await self.repo.get_by_id(proposal_id)
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found")
+
+        # Verify user has project admin access
+        await self._verify_project_access(proposal.project_id, user_id, required_role="admin")
+
+        # Update status to rejected
+        proposal = await self.repo.update_status(
+            proposal_id=proposal_id,
+            new_status="rejected",
+        )
+
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found after rejection")
+
+        # Store rejection reason in metadata
+        metadata = proposal.metadata_json or {}
+        metadata["rejection_reason"] = reason
+        metadata["rejected_by_user_id"] = str(user_id)
+        metadata["rejected_at"] = datetime.now(UTC).isoformat()
+
+        updated_proposal = await self.repo.update(proposal_id, {"metadata_json": metadata})
+
+        if not updated_proposal:
+            raise OpenSpecProposalNotFoundError(
+                f"Proposal {proposal_id} not found after updating metadata"
+            )
+
+        await self.db.flush()
+        await self.db.refresh(updated_proposal)
+
+        logger.info(
+            f"Rejected proposal '{updated_proposal.name}' (id={proposal_id}) by user {user_id}: {reason}"
+        )
+        return updated_proposal
+
+    async def sync_tasks_to_database(
+        self,
+        proposal_id: UUID,
+        user_id: UUID,
+    ) -> list[Task]:
+        """
+        Sync tasks from proposal to database.
+
+        Args:
+            proposal_id: Proposal UUID
+            user_id: User initiating sync
+
+        Returns:
+            List of created Task objects
+
+        Raises:
+            OpenSpecProposalNotFoundError: If proposal not found
+            TaskSyncError: If proposal not approved or sync fails
+            InsufficientOpenSpecPermissionsError: If user lacks permissions
+        """
+        proposal = await self.repo.get_by_id(proposal_id)
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found")
+
+        # Verify user has project member access
+        await self._verify_project_access(proposal.project_id, user_id, required_role="member")
+
+        # Verify proposal is approved
+        if proposal.status != "approved":
+            raise TaskSyncError(
+                f"Cannot sync tasks for proposal with status '{proposal.status}'. "
+                f"Only approved proposals can be synced."
+            )
+
+        # Update sync status to syncing
+        await self.repo.update_sync_status(proposal_id, "syncing")
+        await self.db.flush()
+
+        created_tasks = []
+
+        try:
+            # Parse tasks from tasks_content
+            if not proposal.tasks_content:
+                raise TaskSyncError("Proposal has no tasks content to sync")
+
+            parsed_tasks = self.parser.extract_tasks_from_markdown(proposal.tasks_content)
+
+            if not parsed_tasks:
+                raise TaskSyncError("No parseable tasks found in tasks.md")
+
+            logger.info(f"Parsed {len(parsed_tasks)} tasks from proposal '{proposal.name}'")
+
+            # Create tasks in database
+            for parsed_task in parsed_tasks:
+                # Prepare task data
+                task_data = {
+                    "title": parsed_task.title,
+                    "description": parsed_task.description,
+                    "status": "todo",
+                    "phase": parsed_task.phase,
+                    "estimate_hours": parsed_task.estimated_hours,
+                    "openspec_change_path": proposal.directory_path,
+                    "ai_generated": True,
+                    "ai_confidence": 0.85,  # Default confidence for OpenSpec tasks
+                    "ai_reasoning": f"Generated from OpenSpec proposal: {proposal.name}",
+                }
+
+                # Create task via task service
+                task = await self.task_service.create_task(
+                    project_id=proposal.project_id,
+                    task_data=task_data,
+                    created_by_id=user_id,
+                )
+
+                # Link task to proposal
+                await self.task_service.link_openspec_proposal(
+                    task_id=task.id,
+                    proposal_id=proposal_id,
+                )
+
+                created_tasks.append(task)
+
+                logger.info(
+                    f"Created task {task.identifier} from parsed task {parsed_task.identifier}"
+                )
+
+            # Handle task dependencies (second pass after all tasks created)
+            # Map parsed identifiers to created task UUIDs
+            identifier_to_task = {task.identifier: task for task in created_tasks}
+
+            for i, parsed_task in enumerate(parsed_tasks):
+                if parsed_task.dependencies:
+                    task = created_tasks[i]
+
+                    for dep_identifier in parsed_task.dependencies:
+                        # Find matching task by identifier pattern
+                        # Note: OpenSpec identifiers may not match generated identifiers
+                        # For MVP, we'll skip dependencies that can't be resolved
+                        logger.warning(
+                            f"Task dependency resolution not fully implemented: "
+                            f"{task.identifier} depends on {dep_identifier}"
+                        )
+
+            # Update sync status to synced
+            await self.repo.update_sync_status(
+                proposal_id=proposal_id,
+                sync_status="synced",
+            )
+
+            await self.db.flush()
+
+            logger.info(
+                f"Successfully synced {len(created_tasks)} tasks for proposal '{proposal.name}'"
+            )
+            return created_tasks
+
+        except Exception as e:
+            # Update sync status to failed
+            await self.repo.update_sync_status(
+                proposal_id=proposal_id,
+                sync_status="sync_failed",
+                error_message=str(e),
+            )
+            await self.db.flush()
+
+            logger.error(f"Failed to sync tasks for proposal {proposal_id}: {e}", exc_info=True)
+            raise TaskSyncError(f"Task synchronization failed: {str(e)}")
+
+    async def refresh_from_filesystem(
+        self,
+        proposal_id: UUID,
+        user_id: UUID,
+    ) -> OpenSpecProposal:
+        """
+        Refresh proposal content from filesystem.
+
+        Args:
+            proposal_id: Proposal UUID
+            user_id: User initiating refresh
+
+        Returns:
+            Updated OpenSpecProposal
+
+        Raises:
+            OpenSpecProposalNotFoundError: If proposal not found
+            OpenSpecParseError: If parsing fails
+            InsufficientOpenSpecPermissionsError: If user lacks permissions
+        """
+        proposal = await self.repo.get_by_id(proposal_id)
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found")
+
+        # Verify user has project member access
+        await self._verify_project_access(proposal.project_id, user_id, required_role="member")
+
+        logger.info(f"Refreshing proposal '{proposal.name}' from filesystem")
+
+        # Re-parse from filesystem
+        try:
+            parsed = self.parser.parse_proposal(proposal.name)
+        except OpenSpecFileNotFoundError as e:
+            logger.error(f"Proposal '{proposal.name}' not found on filesystem: {e}")
+            raise OpenSpecParseError(f"Proposal directory not found during refresh: {e}")
+
+        # Validate parsed proposal
+        if not parsed.is_valid:
+            logger.warning(
+                f"Refreshed proposal '{proposal.name}' has validation errors: "
+                f"{parsed.validation_errors}"
+            )
+
+        # Update content in database
+        proposal = await self.repo.update_content(
+            proposal_id=proposal_id,
+            proposal_content=parsed.proposal_content,
+            tasks_content=parsed.tasks_content,
+            spec_delta_content=parsed.spec_delta_content,
+            metadata_json=parsed.metadata.model_dump() if parsed.metadata else None,
+        )
+
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found after refresh")
+
+        await self.db.flush()
+        await self.db.refresh(proposal)
+
+        logger.info(f"Refreshed proposal '{proposal.name}' from filesystem")
+        return proposal
+
+    async def archive_proposal(
+        self,
+        proposal_id: UUID,
+        user_id: UUID,
+    ) -> OpenSpecProposal:
         """
         Archive a completed proposal.
 
+        Moves filesystem directory to archive/ and updates database status.
+
         Args:
-            proposal_id: Proposal identifier
-            reason: Reason for archiving
+            proposal_id: Proposal UUID
+            user_id: User archiving proposal
 
         Returns:
-            True if archived successfully
+            Archived OpenSpecProposal
+
+        Raises:
+            OpenSpecProposalNotFoundError: If proposal not found
+            InsufficientOpenSpecPermissionsError: If user lacks admin permissions
         """
+        proposal = await self.repo.get_by_id(proposal_id)
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found")
+
+        # Verify user has project admin access
+        await self._verify_project_access(proposal.project_id, user_id, required_role="admin")
+
+        logger.info(f"Archiving proposal '{proposal.name}'")
+
+        # Update database status
+        proposal = await self.repo.update_status(
+            proposal_id=proposal_id,
+            new_status="archived",
+        )
+
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found after archive")
+
+        # Move filesystem directory to archive
         try:
-            proposal_path = self.changes_path / proposal_id
-            archive_path = self.base_path / "archive" / proposal_id
+            source_path = Path(proposal.directory_path)
+            archive_dir = self.parser.archive_dir
 
-            if not proposal_path.exists():
-                self.logger.warning(f"Proposal directory not found for archiving: {proposal_id}")
-                return False
+            # Ensure archive directory exists
+            archive_dir.mkdir(parents=True, exist_ok=True)
 
-            # Create archive directory
-            archive_path.parent.mkdir(parents=True, exist_ok=True)
+            # Generate unique archive path (add timestamp if name collision)
+            archive_path = archive_dir / proposal.name
 
-            # Move proposal to archive
-            shutil.move(str(proposal_path), str(archive_path))
+            if archive_path.exists():
+                timestamp = int(datetime.now(UTC).timestamp())
+                archive_path = archive_dir / f"{proposal.name}-{timestamp}"
 
-            # Create archive metadata
-            archive_metadata = {
-                "proposal_id": proposal_id,
-                "archived_at": json.dumps({"timestamp": "now"}),  # Would use real timestamp
-                "reason": reason,
-                "original_path": str(proposal_path),
-            }
+            # Move directory
+            if source_path.exists():
+                shutil.move(str(source_path), str(archive_path))
 
-            with open(archive_path / "archive_metadata.json", "w") as f:
-                json.dump(archive_metadata, f, indent=2)
+                # Update directory path in database
+                await self.repo.update(
+                    proposal_id=proposal_id,
+                    update_data={"directory_path": str(archive_path)},
+                )
 
-            self.logger.info(f"Archived proposal: {proposal_id}")
-            return True
+                # Create archive metadata
+                archive_metadata = {
+                    "original_path": str(source_path),
+                    "archived_at": datetime.now(UTC).isoformat(),
+                    "archived_by_user_id": str(user_id),
+                }
+
+                metadata_file = archive_path / "archive_metadata.json"
+                metadata_file.write_text(
+                    json.dumps(archive_metadata, indent=2),
+                    encoding="utf-8",
+                )
+
+                logger.info(f"Moved proposal directory to archive: {archive_path}")
+            else:
+                logger.warning(f"Proposal directory not found for archival: {source_path}")
 
         except Exception as e:
-            self.logger.error(f"Failed to archive proposal {proposal_id}: {e}")
-            return False
+            logger.error(f"Failed to move proposal directory to archive: {e}", exc_info=True)
+            # Continue - database status is updated even if file move fails
 
-    def list_proposals(self, include_archived: bool = False) -> List[Dict[str, Any]]:
+        await self.db.flush()
+        await self.db.refresh(proposal)
+
+        logger.info(f"Archived proposal '{proposal.name}' (id={proposal_id})")
+        return proposal
+
+    async def delete_proposal(
+        self,
+        proposal_id: UUID,
+        user_id: UUID,
+    ) -> bool:
         """
-        List all proposals.
+        Delete a proposal.
 
         Args:
-            include_archived: Whether to include archived proposals
+            proposal_id: Proposal UUID
+            user_id: User deleting proposal
 
         Returns:
-            List of proposal information
+            True if deleted
+
+        Raises:
+            OpenSpecProposalNotFoundError: If proposal not found
+            TaskSyncError: If proposal has synced tasks
+            InsufficientOpenSpecPermissionsError: If user lacks admin permissions
         """
-        proposals = []
+        proposal = await self.repo.get_by_id(proposal_id)
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found")
 
-        # List active proposals
-        if self.changes_path.exists():
-            for proposal_dir in self.changes_path.iterdir():
-                if proposal_dir.is_dir():
-                    proposals.append(
-                        self._get_proposal_info(proposal_dir.name, proposal_dir, "active")
-                    )
+        # Verify user has project admin access
+        await self._verify_project_access(proposal.project_id, user_id, required_role="admin")
 
-        # List archived proposals
-        if include_archived:
-            archive_path = self.base_path / "archive"
-            if archive_path.exists():
-                for proposal_dir in archive_path.iterdir():
-                    if proposal_dir.is_dir():
-                        proposals.append(
-                            self._get_proposal_info(proposal_dir.name, proposal_dir, "archived")
-                        )
+        # Check if proposal has synced tasks
+        if proposal.task_sync_status == "synced" and proposal.tasks:
+            raise TaskSyncError(
+                f"Cannot delete proposal with synced tasks. "
+                f"Archive the proposal instead, or delete linked tasks first."
+            )
 
-        return proposals
+        # Delete from database
+        success = await self.repo.delete(proposal_id)
 
-    def _get_proposal_info(
-        self, proposal_id: str, proposal_path: Path, status: str
-    ) -> Dict[str, Any]:
-        """Get proposal information from directory."""
-        info = {
-            "proposal_id": proposal_id,
-            "status": status,
-            "path": str(proposal_path),
-        }
-
-        # Check if this is an archived proposal by looking for archive metadata
-        archive_metadata_path = proposal_path / "archive_metadata.json"
-        if archive_metadata_path.exists():
-            info["status"] = "archived"
-            try:
-                with open(archive_metadata_path, "r") as f:
-                    archive_metadata = json.load(f)
-                    info["archived_at"] = archive_metadata.get("archived_at")
-                    info["archive_reason"] = archive_metadata.get("reason")
-            except Exception as e:
-                self.logger.warning(f"Failed to read archive metadata for {proposal_id}: {e}")
+        if success:
+            await self.db.flush()
+            logger.info(f"Deleted proposal '{proposal.name}' (id={proposal_id})")
         else:
-            # Try to read regular metadata
-            metadata_path = proposal_path / "metadata.json"
-            if metadata_path.exists():
-                try:
-                    with open(metadata_path, "r") as f:
-                        metadata = json.load(f)
-                    info.update(metadata)
-                except Exception as e:
-                    self.logger.warning(f"Failed to read metadata for {proposal_id}: {e}")
+            logger.warning(f"Failed to delete proposal {proposal_id}")
 
-        return info
+        return success
 
+    async def calculate_and_update_completion(
+        self,
+        proposal_id: UUID,
+    ) -> int:
+        """
+        Calculate and update completion percentage from linked tasks.
 
-# Global service instance
-_openspec_service: Optional[OpenSpecService] = None
+        Args:
+            proposal_id: Proposal UUID
 
+        Returns:
+            Completion percentage (0-100)
+        """
+        completion = await self.repo.calculate_completion(proposal_id)
+        await self.db.flush()
 
-def get_openspec_service() -> OpenSpecService:
-    """
-    Get cached OpenSpec service instance.
+        logger.debug(f"Calculated completion for proposal {proposal_id}: {completion}%")
+        return completion
 
-    Returns:
-        OpenSpecService instance
-    """
-    global _openspec_service
-    if _openspec_service is None:
-        _openspec_service = OpenSpecService()
-    return _openspec_service
+    async def apply_spec_delta(
+        self,
+        proposal_id: UUID,
+        user_id: UUID,
+    ) -> bool:
+        """
+        Apply spec-delta to main specifications.
+
+        For MVP: Just marks as applied in metadata.
+        Full implementation (applying changes to openspec/project.md) deferred to Phase 6.
+
+        Args:
+            proposal_id: Proposal UUID
+            user_id: User applying spec delta
+
+        Returns:
+            True if marked as applied
+
+        Raises:
+            OpenSpecProposalNotFoundError: If proposal not found
+            InsufficientOpenSpecPermissionsError: If user lacks admin permissions
+        """
+        proposal = await self.repo.get_by_id(proposal_id)
+        if not proposal:
+            raise OpenSpecProposalNotFoundError(f"Proposal {proposal_id} not found")
+
+        # Verify user has project admin access
+        await self._verify_project_access(proposal.project_id, user_id, required_role="admin")
+
+        # For MVP: just mark as applied in metadata
+        metadata = proposal.metadata_json or {}
+        metadata["spec_delta_applied"] = True
+        metadata["spec_delta_applied_by"] = str(user_id)
+        metadata["spec_delta_applied_at"] = datetime.now(UTC).isoformat()
+
+        updated_proposal = await self.repo.update(proposal_id, {"metadata_json": metadata})
+
+        if not updated_proposal:
+            raise OpenSpecProposalNotFoundError(
+                f"Proposal {proposal_id} not found after updating metadata"
+            )
+
+        # Update status to completed if not already
+        if updated_proposal.status != "completed":
+            final_proposal = await self.repo.update_status(proposal_id, "completed")
+            if final_proposal:
+                updated_proposal = final_proposal
+
+        await self.db.flush()
+
+        logger.info(
+            f"Marked spec-delta as applied for proposal '{updated_proposal.name}' (MVP implementation)"
+        )
+        return True
+
+    # ============= Access Control Helper =============
+
+    async def _verify_project_access(
+        self,
+        project_id: UUID,
+        user_id: UUID,
+        required_role: str | None = None,
+    ) -> bool:
+        """
+        Verify user has project access with optional role requirement.
+
+        Args:
+            project_id: Project UUID
+            user_id: User UUID
+            required_role: Minimum required role (viewer/member/admin/owner)
+
+        Returns:
+            True if access granted
+
+        Raises:
+            InsufficientOpenSpecPermissionsError: If user lacks permissions
+        """
+        # Default to viewer if no role specified
+        role = required_role or "viewer"
+
+        has_permission = await self.project_service.check_permission(
+            project_id=project_id,
+            user_id=user_id,
+            required_role=role,
+        )
+
+        if not has_permission:
+            logger.warning(f"User {user_id} lacks '{role}' permission for project {project_id}")
+            raise InsufficientOpenSpecPermissionsError(
+                f"User must have at least '{role}' role in project to perform this operation"
+            )
+
+        return True
