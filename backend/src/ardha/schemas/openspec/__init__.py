@@ -1,5 +1,6 @@
 """OpenSpec schemas package."""
 
+from ardha.schemas.openspec.parsed import ParsedMetadata, ParsedProposal, ParsedTask
 from ardha.schemas.openspec.proposal import (
     ApprovalRequest,
     OpenSpecProposalBase,
@@ -13,6 +14,7 @@ from ardha.schemas.openspec.proposal import (
 )
 
 __all__ = [
+    # Proposal schemas
     "ProposalStatus",
     "TaskSyncStatus",
     "OpenSpecProposalBase",
@@ -22,4 +24,8 @@ __all__ = [
     "OpenSpecProposalListResponse",
     "OpenSpecProposalSummary",
     "ApprovalRequest",
+    # Parsed schemas
+    "ParsedProposal",
+    "ParsedTask",
+    "ParsedMetadata",
 ]

@@ -5,11 +5,13 @@ This module defines custom exception classes for different
 types of errors that can occur in the application.
 """
 
+from typing import Any, List, Optional
+
 
 class ArdhaException(Exception):
     """Base exception for all Ardha application errors."""
 
-    def __init__(self, message: str, details: dict = None):
+    def __init__(self, message: str, details: Optional[dict] = None):
         """
         Initialize base exception.
 
@@ -25,7 +27,9 @@ class ArdhaException(Exception):
 class RepositoryError(ArdhaException):
     """Exception raised for repository-related errors."""
 
-    def __init__(self, message: str, operation: str = None, details: dict = None):
+    def __init__(
+        self, message: str, operation: Optional[str] = None, details: Optional[dict] = None
+    ):
         """
         Initialize repository exception.
 
@@ -41,7 +45,7 @@ class RepositoryError(ArdhaException):
 class ServiceError(ArdhaException):
     """Exception raised for service layer errors."""
 
-    def __init__(self, message: str, service: str = None, details: dict = None):
+    def __init__(self, message: str, service: Optional[str] = None, details: Optional[dict] = None):
         """
         Initialize service exception.
 
@@ -57,7 +61,7 @@ class ServiceError(ArdhaException):
 class ValidationError(ArdhaException):
     """Exception raised for validation errors."""
 
-    def __init__(self, message: str, field: str = None, value: any = None):
+    def __init__(self, message: str, field: Optional[str] = None, value: Any = None):
         """
         Initialize validation exception.
 
@@ -86,7 +90,12 @@ class AuthorizationError(ArdhaException):
 class NotFoundError(ArdhaException):
     """Exception raised when a resource is not found."""
 
-    def __init__(self, message: str, resource_type: str = None, resource_id: str = None):
+    def __init__(
+        self,
+        message: str,
+        resource_type: Optional[str] = None,
+        resource_id: Optional[str] = None,
+    ):
         """
         Initialize not found exception.
 
@@ -109,7 +118,7 @@ class ConflictError(ArdhaException):
 class RateLimitError(ArdhaException):
     """Exception raised when rate limit is exceeded."""
 
-    def __init__(self, message: str, limit: int = None, window: int = None):
+    def __init__(self, message: str, limit: Optional[int] = None, window: Optional[int] = None):
         """
         Initialize rate limit exception.
 
@@ -126,7 +135,12 @@ class RateLimitError(ArdhaException):
 class ExternalServiceError(ArdhaException):
     """Exception raised for external service errors."""
 
-    def __init__(self, message: str, service: str = None, status_code: int = None):
+    def __init__(
+        self,
+        message: str,
+        service: Optional[str] = None,
+        status_code: Optional[int] = None,
+    ):
         """
         Initialize external service exception.
 
@@ -138,3 +152,84 @@ class ExternalServiceError(ArdhaException):
         super().__init__(message)
         self.service = service
         self.status_code = status_code
+
+
+# ============= OpenSpec Exceptions =============
+
+
+class OpenSpecParseError(ArdhaException):
+    """
+    Exception raised when OpenSpec file parsing fails.
+
+    This includes errors reading files, parsing markdown,
+    or processing JSON content.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        file_path: Optional[str] = None,
+        details: Optional[dict] = None,
+    ):
+        """
+        Initialize OpenSpec parse exception.
+
+        Args:
+            message: Error message
+            file_path: Optional path to file that failed to parse
+            details: Optional error details
+        """
+        super().__init__(message, details)
+        self.file_path = file_path
+
+
+class OpenSpecValidationError(ArdhaException):
+    """
+    Exception raised when OpenSpec content validation fails.
+
+    This includes missing required sections, invalid task formats,
+    or structural issues in proposal content.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        validation_errors: Optional[List[str]] = None,
+        details: Optional[dict] = None,
+    ):
+        """
+        Initialize OpenSpec validation exception.
+
+        Args:
+            message: Error message
+            validation_errors: List of specific validation errors
+            details: Optional error details
+        """
+        super().__init__(message, details)
+        self.validation_errors = validation_errors or []
+
+
+class OpenSpecFileNotFoundError(ArdhaException):
+    """
+    Exception raised when required OpenSpec files are missing.
+
+    This includes missing proposal directories or required markdown files.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        file_path: Optional[str] = None,
+        missing_files: Optional[List[str]] = None,
+    ):
+        """
+        Initialize OpenSpec file not found exception.
+
+        Args:
+            message: Error message
+            file_path: Path that was not found
+            missing_files: List of missing file names
+        """
+        super().__init__(message)
+        self.file_path = file_path
+        self.missing_files = missing_files or []
