@@ -2590,7 +2590,7 @@ The complete memory system testing suite is production-ready with comprehensive 
     - Unique constraint on title within project scope
 
 **Database Migration:**
-- ✅ Created [`backend/alembic/versions/openspec_proposal_migration.py`](../../../backend/alembic/versions/openspec_proposal_migration.py:1) - Complete migration
+- ✅ Created [`backend/alembic/versions/dcca79a04cb7_add_openspec_proposals_table.py`](../../../backend/alembic/versions/dcca79a04cb7_add_openspec_proposals_table.py:1) - Complete migration
   - Creates openspec_proposals table with 15+ columns and proper constraints
   - All foreign key constraints with proper cascade rules
   - 6 indexes for optimal query performance

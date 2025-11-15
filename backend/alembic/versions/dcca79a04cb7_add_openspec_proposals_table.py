@@ -41,8 +41,8 @@ def upgrade() -> None:
             "status",
             sa.String(length=20),
             nullable=False,
-            comment="Proposal status: pending, approved, rejected, in_progress, completed, "
-            "archived",
+            comment="Proposal status: pending, approved, rejected, in_progress, "
+            "completed, archived",
         ),
         sa.Column(
             "created_by_user_id",
@@ -51,11 +51,22 @@ def upgrade() -> None:
             comment="UUID of user who created the proposal",
         ),
         sa.Column(
-            "proposal_content", sa.Text(), nullable=True, comment="Content of proposal.md file"
+            "proposal_content",
+            sa.Text(),
+            nullable=True,
+            comment="Content of proposal.md file",
         ),
-        sa.Column("tasks_content", sa.Text(), nullable=True, comment="Content of tasks.md file"),
         sa.Column(
-            "spec_delta_content", sa.Text(), nullable=True, comment="Content of spec-delta.md file"
+            "tasks_content",
+            sa.Text(),
+            nullable=True,
+            comment="Content of tasks.md file",
+        ),
+        sa.Column(
+            "spec_delta_content",
+            sa.Text(),
+            nullable=True,
+            comment="Content of spec-delta.md file",
         ),
         sa.Column(
             "metadata_json",
@@ -121,7 +132,8 @@ def upgrade() -> None:
             comment="Timestamp when record was last updated",
         ),
         sa.CheckConstraint(
-            "status IN ('pending', 'approved', 'rejected', 'in_progress', 'completed', 'archived')",
+            "status IN ('pending', 'approved', 'rejected', 'in_progress', "
+            "'completed', 'archived')",
             name="ck_openspec_status",
         ),
         sa.CheckConstraint(
@@ -132,9 +144,9 @@ def upgrade() -> None:
             "completion_percentage >= 0 AND completion_percentage <= 100",
             name="ck_openspec_completion_percentage",
         ),
-        sa.ForeignKeyConstraint(["approved_by_user_id"], ["users.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["project_id"], ["projects.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["approved_by_user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("project_id", "name", name="uq_openspec_project_name"),
     )
@@ -148,551 +160,11 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_openspec_proposals_status"), "openspec_proposals", ["status"], unique=False
     )
-    op.create_index("ix_openspec_status", "openspec_proposals", ["status"], unique=False)
-    op.drop_index("ix_workflow_executions_created_at", table_name="workflow_executions")
-    op.drop_index("ix_workflow_executions_id", table_name="workflow_executions")
-    op.drop_index("ix_workflow_executions_project_id", table_name="workflow_executions")
-    op.drop_index("ix_workflow_executions_status", table_name="workflow_executions")
-    op.drop_index("ix_workflow_executions_user_id", table_name="workflow_executions")
-    op.drop_index("ix_workflow_executions_workflow_type", table_name="workflow_executions")
-    op.drop_table("workflow_executions")
-    op.alter_column(
-        "memories",
-        "user_id",
-        existing_type=sa.UUID(),
-        comment="UUID of the user who owns this memory",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "project_id",
-        existing_type=sa.UUID(),
-        comment="UUID of associated project (nullable for personal memories)",
-        existing_nullable=True,
-    )
-    op.alter_column(
-        "memories",
-        "content",
-        existing_type=sa.TEXT(),
-        comment="Full text content of the memory",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "summary",
-        existing_type=sa.VARCHAR(length=200),
-        comment="Brief summary of the memory content",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "qdrant_collection",
-        existing_type=sa.VARCHAR(length=50),
-        comment="Name of Qdrant collection for vector storage",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "qdrant_point_id",
-        existing_type=sa.VARCHAR(length=100),
-        comment="Point ID in Qdrant vector database",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "embedding_model",
-        existing_type=sa.VARCHAR(length=100),
-        comment="Name of embedding model used",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "memory_type",
-        existing_type=sa.VARCHAR(length=50),
-        comment="Type of memory (conversation, workflow, document, entity, fact)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "source_type",
-        existing_type=sa.VARCHAR(length=50),
-        comment="Source where memory originated (chat, workflow, manual, api)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "source_id",
-        existing_type=sa.UUID(),
-        comment="Optional UUID of the source record",
-        existing_nullable=True,
-    )
-    op.alter_column(
-        "memories",
-        "importance",
-        existing_type=sa.INTEGER(),
-        comment="Importance score (1-10)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "confidence",
-        existing_type=sa.DOUBLE_PRECISION(precision=53),
-        comment="Confidence score (0.0-1.0)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "access_count",
-        existing_type=sa.INTEGER(),
-        comment="Number of times this memory was accessed",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "last_accessed",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        comment="Timestamp of last access",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "expires_at",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        comment="Optional expiration timestamp",
-        existing_nullable=True,
-    )
-    op.alter_column(
-        "memories",
-        "is_archived",
-        existing_type=sa.BOOLEAN(),
-        comment="Whether memory is archived (soft delete)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "tags",
-        existing_type=postgresql.JSON(astext_type=sa.Text()),
-        comment="Optional JSON dictionary for tags",
-        existing_nullable=True,
-    )
-    op.alter_column(
-        "memories",
-        "extra_metadata",
-        existing_type=postgresql.JSON(astext_type=sa.Text()),
-        comment="Optional JSON dictionary for additional metadata",
-        existing_nullable=True,
-    )
-    op.alter_column(
-        "memories",
-        "id",
-        existing_type=sa.UUID(),
-        comment="Primary key UUID",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "created_at",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        comment="Timestamp when record was created",
-        existing_nullable=False,
-        existing_server_default=sa.text("now()"),
-    )
-    op.alter_column(
-        "memories",
-        "updated_at",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        comment="Timestamp when record was last updated",
-        existing_nullable=False,
-        existing_server_default=sa.text("now()"),
-    )
-    op.drop_index("ix_memory_project_importance", table_name="memories")
-    op.create_index(
-        "ix_memory_project_importance",
-        "memories",
-        ["project_id", sa.text("importance DESC")],
-        unique=False,
-    )
-    op.drop_index("ix_memory_user_created", table_name="memories")
-    op.create_index(
-        "ix_memory_user_created", "memories", ["user_id", sa.text("created_at DESC")], unique=False
-    )
-    op.create_index("ix_memory_qdrant_point", "memories", ["qdrant_point_id"], unique=False)
-    op.alter_column(
-        "memory_links",
-        "memory_from_id",
-        existing_type=sa.UUID(),
-        comment="UUID of the source memory",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memory_links",
-        "memory_to_id",
-        existing_type=sa.UUID(),
-        comment="UUID of the target memory",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memory_links",
-        "relationship_type",
-        existing_type=sa.VARCHAR(length=50),
-        comment="Type of relationship (related_to, depends_on, contradicts, supports)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memory_links",
-        "strength",
-        existing_type=sa.DOUBLE_PRECISION(precision=53),
-        comment="Strength of relationship (0.0-1.0)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memory_links",
-        "id",
-        existing_type=sa.UUID(),
-        comment="Primary key UUID",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memory_links",
-        "created_at",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        comment="Timestamp when record was created",
-        existing_nullable=False,
-        existing_server_default=sa.text("now()"),
-    )
-    op.alter_column(
-        "memory_links",
-        "updated_at",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        comment="Timestamp when record was last updated",
-        existing_nullable=False,
-        existing_server_default=sa.text("now()"),
-    )
-    op.create_index(
-        op.f("ix_tasks_openspec_proposal_id"), "tasks", ["openspec_proposal_id"], unique=False
-    )
-    op.create_foreign_key(
-        None, "tasks", "openspec_proposals", ["openspec_proposal_id"], ["id"], ondelete="SET NULL"
-    )
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_constraint(None, "tasks", type_="foreignkey")
-    op.drop_index(op.f("ix_tasks_openspec_proposal_id"), table_name="tasks")
-    op.alter_column(
-        "memory_links",
-        "updated_at",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        comment=None,
-        existing_comment="Timestamp when record was last updated",
-        existing_nullable=False,
-        existing_server_default=sa.text("now()"),
-    )
-    op.alter_column(
-        "memory_links",
-        "created_at",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        comment=None,
-        existing_comment="Timestamp when record was created",
-        existing_nullable=False,
-        existing_server_default=sa.text("now()"),
-    )
-    op.alter_column(
-        "memory_links",
-        "id",
-        existing_type=sa.UUID(),
-        comment=None,
-        existing_comment="Primary key UUID",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memory_links",
-        "strength",
-        existing_type=sa.DOUBLE_PRECISION(precision=53),
-        comment=None,
-        existing_comment="Strength of relationship (0.0-1.0)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memory_links",
-        "relationship_type",
-        existing_type=sa.VARCHAR(length=50),
-        comment=None,
-        existing_comment="Type of relationship (related_to, depends_on, contradicts, supports)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memory_links",
-        "memory_to_id",
-        existing_type=sa.UUID(),
-        comment=None,
-        existing_comment="UUID of the target memory",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memory_links",
-        "memory_from_id",
-        existing_type=sa.UUID(),
-        comment=None,
-        existing_comment="UUID of the source memory",
-        existing_nullable=False,
-    )
-    op.drop_index("ix_memory_qdrant_point", table_name="memories")
-    op.drop_index("ix_memory_user_created", table_name="memories")
-    op.create_index("ix_memory_user_created", "memories", ["user_id", "created_at"], unique=False)
-    op.drop_index("ix_memory_project_importance", table_name="memories")
-    op.create_index(
-        "ix_memory_project_importance", "memories", ["project_id", "importance"], unique=False
-    )
-    op.alter_column(
-        "memories",
-        "updated_at",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        comment=None,
-        existing_comment="Timestamp when record was last updated",
-        existing_nullable=False,
-        existing_server_default=sa.text("now()"),
-    )
-    op.alter_column(
-        "memories",
-        "created_at",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        comment=None,
-        existing_comment="Timestamp when record was created",
-        existing_nullable=False,
-        existing_server_default=sa.text("now()"),
-    )
-    op.alter_column(
-        "memories",
-        "id",
-        existing_type=sa.UUID(),
-        comment=None,
-        existing_comment="Primary key UUID",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "extra_metadata",
-        existing_type=postgresql.JSON(astext_type=sa.Text()),
-        comment=None,
-        existing_comment="Optional JSON dictionary for additional metadata",
-        existing_nullable=True,
-    )
-    op.alter_column(
-        "memories",
-        "tags",
-        existing_type=postgresql.JSON(astext_type=sa.Text()),
-        comment=None,
-        existing_comment="Optional JSON dictionary for tags",
-        existing_nullable=True,
-    )
-    op.alter_column(
-        "memories",
-        "is_archived",
-        existing_type=sa.BOOLEAN(),
-        comment=None,
-        existing_comment="Whether memory is archived (soft delete)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "expires_at",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        comment=None,
-        existing_comment="Optional expiration timestamp",
-        existing_nullable=True,
-    )
-    op.alter_column(
-        "memories",
-        "last_accessed",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        comment=None,
-        existing_comment="Timestamp of last access",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "access_count",
-        existing_type=sa.INTEGER(),
-        comment=None,
-        existing_comment="Number of times this memory was accessed",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "confidence",
-        existing_type=sa.DOUBLE_PRECISION(precision=53),
-        comment=None,
-        existing_comment="Confidence score (0.0-1.0)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "importance",
-        existing_type=sa.INTEGER(),
-        comment=None,
-        existing_comment="Importance score (1-10)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "source_id",
-        existing_type=sa.UUID(),
-        comment=None,
-        existing_comment="Optional UUID of the source record",
-        existing_nullable=True,
-    )
-    op.alter_column(
-        "memories",
-        "source_type",
-        existing_type=sa.VARCHAR(length=50),
-        comment=None,
-        existing_comment="Source where memory originated (chat, workflow, manual, api)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "memory_type",
-        existing_type=sa.VARCHAR(length=50),
-        comment=None,
-        existing_comment="Type of memory (conversation, workflow, document, entity, fact)",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "embedding_model",
-        existing_type=sa.VARCHAR(length=100),
-        comment=None,
-        existing_comment="Name of embedding model used",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "qdrant_point_id",
-        existing_type=sa.VARCHAR(length=100),
-        comment=None,
-        existing_comment="Point ID in Qdrant vector database",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "qdrant_collection",
-        existing_type=sa.VARCHAR(length=50),
-        comment=None,
-        existing_comment="Name of Qdrant collection for vector storage",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "summary",
-        existing_type=sa.VARCHAR(length=200),
-        comment=None,
-        existing_comment="Brief summary of the memory content",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "content",
-        existing_type=sa.TEXT(),
-        comment=None,
-        existing_comment="Full text content of the memory",
-        existing_nullable=False,
-    )
-    op.alter_column(
-        "memories",
-        "project_id",
-        existing_type=sa.UUID(),
-        comment=None,
-        existing_comment="UUID of associated project (nullable for personal memories)",
-        existing_nullable=True,
-    )
-    op.alter_column(
-        "memories",
-        "user_id",
-        existing_type=sa.UUID(),
-        comment=None,
-        existing_comment="UUID of the user who owns this memory",
-        existing_nullable=False,
-    )
-    op.create_table(
-        "workflow_executions",
-        sa.Column("id", sa.UUID(), autoincrement=False, nullable=False),
-        sa.Column("user_id", sa.UUID(), autoincrement=False, nullable=False),
-        sa.Column("project_id", sa.UUID(), autoincrement=False, nullable=True),
-        sa.Column("workflow_type", sa.VARCHAR(length=50), autoincrement=False, nullable=False),
-        sa.Column("status", sa.VARCHAR(length=20), autoincrement=False, nullable=False),
-        sa.Column(
-            "input_data", postgresql.JSON(astext_type=sa.Text()), autoincrement=False, nullable=True
-        ),
-        sa.Column(
-            "output_data",
-            postgresql.JSON(astext_type=sa.Text()),
-            autoincrement=False,
-            nullable=True,
-        ),
-        sa.Column(
-            "checkpoint_data",
-            postgresql.JSON(astext_type=sa.Text()),
-            autoincrement=False,
-            nullable=True,
-        ),
-        sa.Column("error_message", sa.TEXT(), autoincrement=False, nullable=True),
-        sa.Column("total_tokens", sa.INTEGER(), autoincrement=False, nullable=False),
-        sa.Column(
-            "total_cost", sa.NUMERIC(precision=10, scale=4), autoincrement=False, nullable=False
-        ),
-        sa.Column(
-            "created_at",
-            postgresql.TIMESTAMP(timezone=True),
-            server_default=sa.text("now()"),
-            autoincrement=False,
-            nullable=False,
-        ),
-        sa.Column(
-            "updated_at",
-            postgresql.TIMESTAMP(timezone=True),
-            server_default=sa.text("now()"),
-            autoincrement=False,
-            nullable=False,
-        ),
-        sa.Column(
-            "started_at", postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True
-        ),
-        sa.Column(
-            "completed_at", postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True
-        ),
-        sa.Column("is_deleted", sa.BOOLEAN(), autoincrement=False, nullable=False),
-        sa.Column(
-            "deleted_at", postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True
-        ),
-        sa.ForeignKeyConstraint(
-            ["project_id"], ["projects.id"], name="workflow_executions_project_id_fkey"
-        ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name="workflow_executions_user_id_fkey"),
-        sa.PrimaryKeyConstraint("id", name="workflow_executions_pkey"),
-    )
-    op.create_index(
-        "ix_workflow_executions_workflow_type",
-        "workflow_executions",
-        ["workflow_type"],
-        unique=False,
-    )
-    op.create_index(
-        "ix_workflow_executions_user_id", "workflow_executions", ["user_id"], unique=False
-    )
-    op.create_index(
-        "ix_workflow_executions_status", "workflow_executions", ["status"], unique=False
-    )
-    op.create_index(
-        "ix_workflow_executions_project_id", "workflow_executions", ["project_id"], unique=False
-    )
-    op.create_index("ix_workflow_executions_id", "workflow_executions", ["id"], unique=False)
-    op.create_index(
-        "ix_workflow_executions_created_at", "workflow_executions", ["created_at"], unique=False
-    )
-    op.drop_index("ix_openspec_status", table_name="openspec_proposals")
     op.drop_index(op.f("ix_openspec_proposals_status"), table_name="openspec_proposals")
     op.drop_index(op.f("ix_openspec_proposals_project_id"), table_name="openspec_proposals")
     op.drop_index("ix_openspec_project_status", table_name="openspec_proposals")
