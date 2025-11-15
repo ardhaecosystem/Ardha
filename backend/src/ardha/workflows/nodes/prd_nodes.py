@@ -10,38 +10,40 @@ import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from .base import BaseNode
 from ...schemas.workflows.prd import PRDState, PRDStepResult
-from ...workflows.state import WorkflowState, WorkflowContext
+from ...workflows.state import WorkflowContext, WorkflowState
+from .base import BaseNode
 
 
 class PRDBaseNode(BaseNode):
     """Base class for PRD workflow nodes with name property compatibility."""
-    
+
     @property
     def name(self) -> str:
         """Get node name for compatibility."""
         return self.node_name
+
 
 logger = logging.getLogger(__name__)
 
 
 class PRDNodeException(Exception):
     """Base exception for PRD workflow nodes."""
+
     pass
 
 
 class ExtractRequirementsNode(PRDBaseNode):
     """
     Node for extracting functional and non-functional requirements from research.
-    
+
     Takes research summary and extracts structured requirements that will
     form the foundation of the PRD document.
     """
-    
+
     def __init__(self):
         super().__init__("extract_requirements")
-    
+
     async def execute(
         self,
         state: WorkflowState,
@@ -49,22 +51,22 @@ class ExtractRequirementsNode(PRDBaseNode):
     ) -> Dict[str, Any]:
         """
         Extract requirements from research summary.
-        
+
         Args:
             state: Current PRD workflow state
             context: Workflow execution context
-            
+
         Returns:
             Extracted requirements structure
         """
         try:
             # Cast to PRDState to access PRD-specific attributes
             prd_state = state if isinstance(state, PRDState) else PRDState(**state.model_dump())
-            
+
             self.logger.info("Extracting requirements from research summary")
-            
+
             # Prepare system prompt for requirements extraction
-            system_prompt = """You are a expert product analyst and requirements engineer. 
+            system_prompt = """You are a expert product analyst and requirements engineer.
 
 Your task is to extract comprehensive requirements from the provided research summary.
 
@@ -93,7 +95,7 @@ Format your response as structured JSON with the following schema:
   ],
   "non_functional_requirements": [
     {
-      "id": "REQ-NF-001", 
+      "id": "REQ-NF-001",
       "description": "Performance, security, usability, etc. requirements",
       "priority": "High|Medium|Low",
       "category": "Performance|Security|Usability|Reliability|Scalability",
@@ -124,7 +126,7 @@ Format your response as structured JSON with the following schema:
 }
 
 Focus on clarity, completeness, and measurability. Each requirement should be testable and unambiguous."""
-            
+
             # Prepare user prompt with research summary
             user_prompt = f"""Extract comprehensive requirements from the following research summary:
 
@@ -137,60 +139,71 @@ Please analyze the research and extract all relevant requirements following the 
 - Complete and comprehensive
 
 Return only valid JSON that can be parsed."""
-            
+
             # Make AI call
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "user", "content": user_prompt},
             ]
-            
-            model = context.settings.get("extract_requirements_model", "anthropic/claude-sonnet-4.5")
+
+            model = context.settings.get(
+                "extract_requirements_model", "anthropic/claude-sonnet-4.5"
+            )
             response = await self._call_ai(messages, model, context, state, temperature=0.3)
-            
+
             # Parse and validate the response
             try:
                 requirements_data = json.loads(response)
-                
+
                 # Validate structure
-                required_sections = ["functional_requirements", "non_functional_requirements", 
-                                  "business_requirements", "technical_requirements", "requirements_summary"]
-                
+                required_sections = [
+                    "functional_requirements",
+                    "non_functional_requirements",
+                    "business_requirements",
+                    "technical_requirements",
+                    "requirements_summary",
+                ]
+
                 for section in required_sections:
                     if section not in requirements_data:
                         raise ValueError(f"Missing required section: {section}")
-                
+
                 # Calculate completeness score
                 total_requirements = requirements_data["requirements_summary"]["total_requirements"]
                 expected_minimum = 5  # Minimum requirements for a decent PRD
-                completeness_score = min(1.0, total_requirements / max(expected_minimum, total_requirements))
-                
+                completeness_score = min(
+                    1.0, total_requirements / max(expected_minimum, total_requirements)
+                )
+
                 # Store result
                 result = {
                     "requirements": requirements_data,
                     "total_requirements": total_requirements,
                     "completeness_score": completeness_score,
-                    "extraction_confidence": 0.85 if total_requirements >= expected_minimum else 0.65,
+                    "extraction_confidence": (
+                        0.85 if total_requirements >= expected_minimum else 0.65
+                    ),
                     "model_used": model,
                 }
-                
+
                 # Update state quality metrics
                 prd_state.requirements_completeness = completeness_score
-                
+
                 # Update the original state with PRD-specific attributes
-                if hasattr(state, 'model_dump'):
+                if hasattr(state, "model_dump"):
                     state_dict = state.model_dump()
                     state_dict.update(prd_state.model_dump())
                     for key, value in state_dict.items():
                         if hasattr(state, key):
                             setattr(state, key, value)
-                
+
                 self.logger.info(f"Successfully extracted {total_requirements} requirements")
                 return result
-                
+
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to parse requirements JSON: {e}")
                 raise PRDNodeException(f"Invalid JSON response from AI: {e}")
-            
+
         except Exception as e:
             self.logger.error(f"Requirements extraction failed: {e}")
             raise PRDNodeException(f"Requirements extraction failed: {str(e)}") from e
@@ -199,14 +212,14 @@ Return only valid JSON that can be parsed."""
 class DefineFeaturesNode(PRDBaseNode):
     """
     Node for defining and prioritizing features based on requirements.
-    
+
     Takes extracted requirements and breaks them down into a prioritized
     feature list using MoSCoW prioritization method.
     """
-    
+
     def __init__(self):
         super().__init__("define_features")
-    
+
     async def execute(
         self,
         state: WorkflowState,
@@ -214,20 +227,20 @@ class DefineFeaturesNode(PRDBaseNode):
     ) -> Dict[str, Any]:
         """
         Define and prioritize features from requirements.
-        
+
         Args:
             state: Current PRD workflow state
             context: Workflow execution context
-            
+
         Returns:
             Prioritized feature roadmap
         """
         try:
             # Cast to PRDState to access PRD-specific attributes
             prd_state = state if isinstance(state, PRDState) else PRDState(**state.model_dump())
-            
+
             self.logger.info("Defining and prioritizing features from requirements")
-            
+
             # Prepare system prompt for feature definition
             system_prompt = """You are a expert product manager and solution architect.
 
@@ -285,7 +298,7 @@ Format your response as structured JSON:
 }
 
 Focus on creating a logical, implementable feature roadmap that balances user value with technical feasibility."""
-            
+
             # Prepare user prompt with requirements
             user_prompt = f"""Convert the following requirements into a prioritized feature roadmap:
 
@@ -298,39 +311,39 @@ Please analyze these requirements and create a comprehensive feature roadmap fol
 - MVP definition and release phases
 
 Return only valid JSON that can be parsed."""
-            
+
             # Make AI call
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "user", "content": user_prompt},
             ]
-            
+
             model = context.settings.get("define_features_model", "z-ai/glm-4.6")
             response = await self._call_ai(messages, model, context, state, temperature=0.4)
-            
+
             # Parse and validate the response
             try:
                 features_data = json.loads(response)
-                
+
                 # Validate structure
                 required_sections = ["features", "feature_roadmap", "release_phases"]
-                
+
                 for section in required_sections:
                     if section not in features_data:
                         raise ValueError(f"Missing required section: {section}")
-                
+
                 # Calculate prioritization quality
                 total_features = features_data["feature_roadmap"]["total_features"]
                 priority_dist = features_data["feature_roadmap"]["priority_distribution"]
-                
+
                 # Good prioritization has reasonable distribution (not all MUST or all COULD)
                 must_ratio = priority_dist.get("M", 0) / max(total_features, 1)
                 should_ratio = priority_dist.get("S", 0) / max(total_features, 1)
-                
+
                 # Quality score based on balanced prioritization
                 prioritization_quality = 1.0 - abs(0.3 - must_ratio) - abs(0.4 - should_ratio)
                 prioritization_quality = max(0.0, min(1.0, prioritization_quality))
-                
+
                 # Store result
                 result = {
                     "features": features_data,
@@ -340,25 +353,27 @@ Return only valid JSON that can be parsed."""
                     "should_have_count": priority_dist.get("S", 0),
                     "model_used": model,
                 }
-                
+
                 # Update state quality metrics
                 prd_state.feature_prioritization_quality = prioritization_quality
-                
+
                 # Update the original state with PRD-specific attributes
-                if hasattr(state, 'model_dump'):
+                if hasattr(state, "model_dump"):
                     state_dict = state.model_dump()
                     state_dict.update(prd_state.model_dump())
                     for key, value in state_dict.items():
                         if hasattr(state, key):
                             setattr(state, key, value)
-                
-                self.logger.info(f"Successfully defined {total_features} features with prioritization")
+
+                self.logger.info(
+                    f"Successfully defined {total_features} features with prioritization"
+                )
                 return result
-                
+
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to parse features JSON: {e}")
                 raise PRDNodeException(f"Invalid JSON response from AI: {e}")
-            
+
         except Exception as e:
             self.logger.error(f"Feature definition failed: {e}")
             raise PRDNodeException(f"Feature definition failed: {str(e)}") from e
@@ -367,14 +382,14 @@ Return only valid JSON that can be parsed."""
 class SetMetricsNode(PRDBaseNode):
     """
     Node for defining success metrics and KPIs.
-    
+
     Takes features and requirements and defines measurable success
     criteria and key performance indicators.
     """
-    
+
     def __init__(self):
         super().__init__("set_metrics")
-    
+
     async def execute(
         self,
         state: WorkflowState,
@@ -382,20 +397,20 @@ class SetMetricsNode(PRDBaseNode):
     ) -> Dict[str, Any]:
         """
         Define success metrics and KPIs.
-        
+
         Args:
             state: Current PRD workflow state
             context: Workflow execution context
-            
+
         Returns:
             Success metrics and KPIs structure
         """
         try:
             # Cast to PRDState to access PRD-specific attributes
             prd_state = state if isinstance(state, PRDState) else PRDState(**state.model_dump())
-            
+
             self.logger.info("Defining success metrics and KPIs")
-            
+
             # Prepare system prompt for metrics definition
             system_prompt = """You are a expert product analyst and data scientist.
 
@@ -503,13 +518,10 @@ Format your response as structured JSON:
 }
 
 Focus on metrics that are actionable, measurable, and directly tied to product success."""
-            
+
             # Prepare user prompt with requirements and features
-            context_data = {
-                "requirements": prd_state.requirements,
-                "features": prd_state.features
-            }
-            
+            context_data = {"requirements": prd_state.requirements, "features": prd_state.features}
+
             user_prompt = f"""Define comprehensive success metrics and KPIs for the following product:
 
 Requirements and Features:
@@ -522,35 +534,41 @@ Please analyze this product and define measurable success metrics that will help
 - User satisfaction and adoption metrics
 
 Return only valid JSON that can be parsed."""
-            
+
             # Make AI call
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "user", "content": user_prompt},
             ]
-            
+
             model = context.settings.get("set_metrics_model", "z-ai/glm-4.6")
             response = await self._call_ai(messages, model, context, state, temperature=0.3)
-            
+
             # Parse and validate the response
             try:
                 metrics_data = json.loads(response)
-                
+
                 # Validate structure
                 required_sections = ["success_metrics", "kpi_dashboard", "metrics_summary"]
-                
+
                 for section in required_sections:
                     if section not in metrics_data:
                         raise ValueError(f"Missing required section: {section}")
-                
+
                 # Calculate metrics specificity
                 total_metrics = metrics_data["metrics_summary"]["total_metrics"]
-                category_coverage = len([cat for cat, count in metrics_data["metrics_summary"]["by_category"].items() if count > 0])
-                
+                category_coverage = len(
+                    [
+                        cat
+                        for cat, count in metrics_data["metrics_summary"]["by_category"].items()
+                        if count > 0
+                    ]
+                )
+
                 # Specificity score based on coverage and detail
                 specificity_score = (total_metrics / 20.0) * 0.5 + (category_coverage / 5.0) * 0.5
                 specificity_score = min(1.0, specificity_score)
-                
+
                 # Store result
                 result = {
                     "success_metrics": metrics_data,
@@ -559,25 +577,25 @@ Return only valid JSON that can be parsed."""
                     "category_coverage": category_coverage,
                     "model_used": model,
                 }
-                
+
                 # Update state quality metrics
                 prd_state.metrics_specificity = specificity_score
-                
+
                 # Update the original state with PRD-specific attributes
-                if hasattr(state, 'model_dump'):
+                if hasattr(state, "model_dump"):
                     state_dict = state.model_dump()
                     state_dict.update(prd_state.model_dump())
                     for key, value in state_dict.items():
                         if hasattr(state, key):
                             setattr(state, key, value)
-                
+
                 self.logger.info(f"Successfully defined {total_metrics} success metrics")
                 return result
-                
+
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to parse metrics JSON: {e}")
                 raise PRDNodeException(f"Invalid JSON response from AI: {e}")
-            
+
         except Exception as e:
             self.logger.error(f"Metrics definition failed: {e}")
             raise PRDNodeException(f"Metrics definition failed: {str(e)}") from e
@@ -586,14 +604,14 @@ Return only valid JSON that can be parsed."""
 class GeneratePRDNode(PRDBaseNode):
     """
     Node for generating the complete PRD document.
-    
+
     Takes all previous outputs and generates a comprehensive
     PRD document in Markdown format.
     """
-    
+
     def __init__(self):
         super().__init__("generate_prd")
-    
+
     async def execute(
         self,
         state: WorkflowState,
@@ -601,20 +619,20 @@ class GeneratePRDNode(PRDBaseNode):
     ) -> Dict[str, Any]:
         """
         Generate complete PRD document.
-        
+
         Args:
             state: Current PRD workflow state
             context: Workflow execution context
-            
+
         Returns:
             Generated PRD document content
         """
         try:
             # Cast to PRDState to access PRD-specific attributes
             prd_state = state if isinstance(state, PRDState) else PRDState(**state.model_dump())
-            
+
             self.logger.info("Generating complete PRD document")
-            
+
             # Prepare system prompt for PRD generation
             system_prompt = """You are a expert technical writer and product manager.
 
@@ -646,7 +664,7 @@ Focus on creating a document that is:
 - Actionable for development teams
 - Professional in presentation
 - Complete with all necessary details"""
-            
+
             # Prepare user prompt with all previous outputs
             prd_context = {
                 "research_summary": prd_state.research_summary,
@@ -654,9 +672,11 @@ Focus on creating a document that is:
                 "features": prd_state.features,
                 "success_metrics": prd_state.success_metrics,
                 "version": prd_state.version,
-                "last_updated": prd_state._get_timestamp() if hasattr(prd_state, '_get_timestamp') else None
+                "last_updated": (
+                    prd_state._get_timestamp() if hasattr(prd_state, "_get_timestamp") else None
+                ),
             }
-            
+
             user_prompt = f"""Generate a comprehensive Product Requirements Document (PRD) from the following information:
 
 {json.dumps(prd_context, indent=2, default=str)}
@@ -668,40 +688,44 @@ Please create a well-formatted Markdown PRD that includes all standard sections 
 - Complete with all necessary details for development
 
 Generate the complete PRD document in Markdown format."""
-            
+
             # Make AI call
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "user", "content": user_prompt},
             ]
-            
+
             model = context.settings.get("generate_prd_model", "anthropic/claude-sonnet-4.5")
             response = await self._call_ai(messages, model, context, state, temperature=0.2)
-            
+
             # Store result
             result = {
                 "prd_content": response,
                 "document_length": len(response),
-                "section_count": response.count('#'),  # Count Markdown headers
+                "section_count": response.count("#"),  # Count Markdown headers
                 "model_used": model,
-                "generation_timestamp": state._get_timestamp() if hasattr(state, '_get_timestamp') else None,
+                "generation_timestamp": (
+                    state._get_timestamp() if hasattr(state, "_get_timestamp") else None
+                ),
             }
-            
+
             # Calculate document coherence (basic heuristic)
-            coherence_score = min(1.0, result["section_count"] / 10.0)  # At least 10 sections for good structure
+            coherence_score = min(
+                1.0, result["section_count"] / 10.0
+            )  # At least 10 sections for good structure
             prd_state.document_coherence = coherence_score
-            
+
             # Update the original state with PRD-specific attributes
-            if hasattr(state, 'model_dump'):
+            if hasattr(state, "model_dump"):
                 state_dict = state.model_dump()
                 state_dict.update(prd_state.model_dump())
                 for key, value in state_dict.items():
                     if hasattr(state, key):
                         setattr(state, key, value)
-            
+
             self.logger.info(f"Successfully generated PRD document ({len(response)} characters)")
             return result
-            
+
         except Exception as e:
             self.logger.error(f"PRD generation failed: {e}")
             raise PRDNodeException(f"PRD generation failed: {str(e)}") from e
@@ -710,14 +734,14 @@ Generate the complete PRD document in Markdown format."""
 class ReviewFormatNode(PRDBaseNode):
     """
     Node for reviewing and formatting the final PRD.
-    
+
     Takes the generated PRD and reviews it for completeness,
     consistency, and proper formatting.
     """
-    
+
     def __init__(self):
         super().__init__("review_format")
-    
+
     async def execute(
         self,
         state: WorkflowState,
@@ -725,20 +749,20 @@ class ReviewFormatNode(PRDBaseNode):
     ) -> Dict[str, Any]:
         """
         Review and format the final PRD.
-        
+
         Args:
             state: Current PRD workflow state
             context: Workflow execution context
-            
+
         Returns:
             Final polished PRD document
         """
         try:
             # Cast to PRDState to access PRD-specific attributes
             prd_state = state if isinstance(state, PRDState) else PRDState(**state.model_dump())
-            
+
             self.logger.info("Reviewing and formatting final PRD")
-            
+
             # Prepare system prompt for PRD review
             system_prompt = """You are a expert technical editor and quality assurance specialist.
 
@@ -784,7 +808,7 @@ Format your response as:
 }
 
 Focus on creating a high-quality, professional document that development teams can rely on."""
-            
+
             # Prepare user prompt with generated PRD
             user_prompt = f"""Review and polish the following Product Requirements Document:
 
@@ -800,31 +824,36 @@ Context information:
 Please review this PRD for completeness, consistency, clarity, and formatting. Make any necessary improvements to create a professional, high-quality document. Return the complete polished PRD along with your review assessment.
 
 Return only valid JSON that can be parsed."""
-            
+
             # Make AI call
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "user", "content": user_prompt},
             ]
-            
+
             model = context.settings.get("review_format_model", "z-ai/glm-4.6")
             response = await self._call_ai(messages, model, context, state, temperature=0.1)
-            
+
             # Parse and validate the response
             try:
                 review_data = json.loads(response)
-                
+
                 # Validate structure
-                required_sections = ["review_summary", "issues_found", "improvements_made", "final_prd"]
-                
+                required_sections = [
+                    "review_summary",
+                    "issues_found",
+                    "improvements_made",
+                    "final_prd",
+                ]
+
                 for section in required_sections:
                     if section not in review_data:
                         raise ValueError(f"Missing required section: {section}")
-                
+
                 # Extract final PRD
                 final_prd = review_data["final_prd"]
                 review_summary = review_data["review_summary"]
-                
+
                 # Store result
                 result = {
                     "final_prd": final_prd,
@@ -834,22 +863,26 @@ Return only valid JSON that can be parsed."""
                     "final_document_length": len(final_prd),
                     "model_used": model,
                 }
-                
+
                 # Update final state
                 prd_state.final_prd = final_prd
-                prd_state.last_updated = prd_state._get_timestamp() if hasattr(prd_state, '_get_timestamp') else None
-                
+                prd_state.last_updated = (
+                    prd_state._get_timestamp() if hasattr(prd_state, "_get_timestamp") else None
+                )
+
                 # Update the original state with PRD-specific attributes
-                if hasattr(state, 'model_dump'):
+                if hasattr(state, "model_dump"):
                     state_dict = state.model_dump()
                     state_dict.update(prd_state.model_dump())
                     for key, value in state_dict.items():
                         if hasattr(state, key):
                             setattr(state, key, value)
-                
-                self.logger.info(f"Successfully reviewed and finalized PRD ({len(final_prd)} characters)")
+
+                self.logger.info(
+                    f"Successfully reviewed and finalized PRD ({len(final_prd)} characters)"
+                )
                 return result
-                
+
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to parse review JSON: {e}")
                 # If JSON parsing fails, treat the response as the final PRD
@@ -861,20 +894,22 @@ Return only valid JSON that can be parsed."""
                     "final_document_length": len(response),
                     "model_used": model,
                 }
-                
+
                 prd_state.final_prd = response
-                prd_state.last_updated = prd_state._get_timestamp() if hasattr(prd_state, '_get_timestamp') else None
-                
+                prd_state.last_updated = (
+                    prd_state._get_timestamp() if hasattr(prd_state, "_get_timestamp") else None
+                )
+
                 # Update the original state with PRD-specific attributes
-                if hasattr(state, 'model_dump'):
+                if hasattr(state, "model_dump"):
                     state_dict = state.model_dump()
                     state_dict.update(prd_state.model_dump())
                     for key, value in state_dict.items():
                         if hasattr(state, key):
                             setattr(state, key, value)
-                
+
                 return result
-            
+
         except Exception as e:
             self.logger.error(f"PRD review failed: {e}")
             raise PRDNodeException(f"PRD review failed: {str(e)}") from e

@@ -13,9 +13,9 @@ from pydantic import BaseModel, ConfigDict
 class ProjectMemberResponse(BaseModel):
     """
     Response schema for project member.
-    
+
     Includes member metadata and associated user information.
-    
+
     Attributes:
         id: ProjectMember UUID
         user_id: UUID of the user
@@ -25,26 +25,26 @@ class ProjectMemberResponse(BaseModel):
         user_username: User's username (if available)
         user_full_name: User's full name (if available)
     """
-    
+
     id: UUID
     user_id: UUID
     role: str
     joined_at: datetime
-    
+
     # User data (populated from relationship)
     user_email: str | None = None
     user_username: str | None = None
     user_full_name: str | None = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class ProjectResponse(BaseModel):
     """
     Response schema for project.
-    
+
     Complete project information including metadata, settings, and statistics.
-    
+
     Attributes:
         id: Project UUID
         name: Project display name
@@ -63,7 +63,7 @@ class ProjectResponse(BaseModel):
         updated_at: When project was last updated
         member_count: Number of team members (computed)
     """
-    
+
     id: UUID
     name: str
     description: str | None
@@ -79,24 +79,24 @@ class ProjectResponse(BaseModel):
     archived_at: datetime | None
     created_at: datetime
     updated_at: datetime
-    
+
     # Computed fields
     member_count: int | None = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class ProjectListResponse(BaseModel):
     """
     Response schema for paginated project list.
-    
+
     Attributes:
         projects: List of projects
         total: Total number of projects (before pagination)
         skip: Number of records skipped
         limit: Maximum results per page
     """
-    
+
     projects: list[ProjectResponse]
     total: int
     skip: int = 0

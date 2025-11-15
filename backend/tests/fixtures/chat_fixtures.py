@@ -5,23 +5,24 @@ This module provides fixtures for chat-related tests including
 sample chats, messages, and mock responses.
 """
 
-import pytest
+from datetime import datetime
+from decimal import Decimal
 from unittest.mock import MagicMock
 from uuid import uuid4
-from decimal import Decimal
-from datetime import datetime
+
+import pytest
 
 from ardha.models.chat import Chat, ChatMode
 from ardha.models.message import Message, MessageRole
-from ardha.models.user import User
 from ardha.models.project import Project
+from ardha.models.user import User
 
 
 @pytest.fixture
 async def sample_chat(test_db):
     """
     Create a sample chat with messages for testing.
-    
+
     Returns:
         Chat object with associated messages
     """
@@ -39,7 +40,7 @@ async def sample_chat(test_db):
     )
     test_db.add(user)
     await test_db.flush()
-    
+
     # Create project (optional)
     project = Project(
         id=uuid4(),
@@ -52,7 +53,7 @@ async def sample_chat(test_db):
     )
     test_db.add(project)
     await test_db.flush()
-    
+
     # Create chat
     chat = Chat(
         id=uuid4(),
@@ -68,7 +69,7 @@ async def sample_chat(test_db):
     )
     test_db.add(chat)
     await test_db.flush()
-    
+
     # Create system message
     system_message = Message(
         id=uuid4(),
@@ -79,7 +80,7 @@ async def sample_chat(test_db):
         updated_at=datetime.utcnow(),
     )
     test_db.add(system_message)
-    
+
     # Create user message
     user_message = Message(
         id=uuid4(),
@@ -90,7 +91,7 @@ async def sample_chat(test_db):
         updated_at=datetime.utcnow(),
     )
     test_db.add(user_message)
-    
+
     # Create assistant message
     assistant_message = Message(
         id=uuid4(),
@@ -106,12 +107,12 @@ async def sample_chat(test_db):
         updated_at=datetime.utcnow(),
     )
     test_db.add(assistant_message)
-    
+
     await test_db.commit()
-    
+
     # Load relationships
     await test_db.refresh(chat)
-    
+
     return chat
 
 
@@ -119,7 +120,7 @@ async def sample_chat(test_db):
 async def sample_chats_batch(test_db):
     """
     Create multiple sample chats for pagination testing.
-    
+
     Returns:
         List of Chat objects
     """
@@ -137,10 +138,16 @@ async def sample_chats_batch(test_db):
     )
     test_db.add(user)
     await test_db.flush()
-    
+
     chats = []
-    modes = [ChatMode.RESEARCH, ChatMode.ARCHITECT, ChatMode.IMPLEMENT, ChatMode.DEBUG, ChatMode.CHAT]
-    
+    modes = [
+        ChatMode.RESEARCH,
+        ChatMode.ARCHITECT,
+        ChatMode.IMPLEMENT,
+        ChatMode.DEBUG,
+        ChatMode.CHAT,
+    ]
+
     for i, mode in enumerate(modes):
         chat = Chat(
             id=uuid4(),
@@ -156,7 +163,7 @@ async def sample_chats_batch(test_db):
         )
         test_db.add(chat)
         chats.append(chat)
-        
+
         # Add system message
         system_message = Message(
             id=uuid4(),
@@ -167,13 +174,13 @@ async def sample_chats_batch(test_db):
             updated_at=datetime.utcnow(),
         )
         test_db.add(system_message)
-    
+
     await test_db.commit()
-    
+
     # Load relationships
     for chat in chats:
         await test_db.refresh(chat)
-    
+
     return chats
 
 
@@ -181,7 +188,7 @@ async def sample_chats_batch(test_db):
 def mock_openrouter_response():
     """
     Mock OpenRouter API response for testing.
-    
+
     Returns:
         MagicMock configured to simulate OpenRouter streaming response
     """
@@ -193,9 +200,9 @@ def mock_openrouter_response():
         "demonstrated improved quantum error correction ",
         "and increased qubit stability. ",
         "These advances bring practical quantum ",
-        "applications closer to reality."
+        "applications closer to reality.",
     ]
-    
+
     # Create mock chunk objects
     mock_chunks = []
     for i, content in enumerate(chunks):
@@ -203,7 +210,7 @@ def mock_openrouter_response():
         chunk.content = content
         chunk.index = i
         mock_chunks.append(chunk)
-    
+
     return mock_chunks
 
 
@@ -211,20 +218,18 @@ def mock_openrouter_response():
 def mock_openrouter_error_response():
     """
     Mock OpenRouter error response for testing error handling.
-    
+
     Returns:
         OpenRouterError instance for testing
     """
     from ardha.core.openrouter import OpenRouterError
-    
+
     # Create a real OpenRouterError instance instead of mocking it
     # This is type-safe and behaves exactly like a real exception
     error = OpenRouterError(
-        message="Rate limit exceeded",
-        error_type="rate_limit_error",
-        code="429"
+        message="Rate limit exceeded", error_type="rate_limit_error", code="429"
     )
-    
+
     return error
 
 
@@ -232,41 +237,42 @@ def mock_openrouter_error_response():
 async def websocket_connection_helper():
     """
     Helper fixture for WebSocket connection testing.
-    
+
     Returns:
         Dictionary with WebSocket test utilities
     """
+
     class WebSocketHelper:
         def __init__(self):
             self.messages = []
             self.connections = []
-        
+
         async def mock_connect(self, websocket, chat_id):
             """Mock WebSocket connection."""
             self.connections.append((websocket, chat_id))
             return True
-        
+
         async def mock_disconnect(self, websocket):
             """Mock WebSocket disconnection."""
             self.connections = [(ws, cid) for ws, cid in self.connections if ws != websocket]
-        
+
         async def mock_send_message(self, websocket, message):
             """Mock sending message through WebSocket."""
             self.messages.append(message)
             return True
-        
+
         def get_messages(self):
             """Get all sent messages."""
             return self.messages
-        
+
         def get_connection_count(self):
             """Get number of active connections."""
             return len(self.connections)
-        
+
         def clear_messages(self):
             """Clear message history."""
             self.messages.clear()
-    
+
     return WebSocketHelper()
 
 
@@ -274,7 +280,7 @@ async def websocket_connection_helper():
 async def chat_with_project(test_db):
     """
     Create a chat associated with a project for testing project-specific features.
-    
+
     Returns:
         Tuple of (Chat, Project, User)
     """
@@ -292,7 +298,7 @@ async def chat_with_project(test_db):
     )
     test_db.add(user)
     await test_db.flush()
-    
+
     # Create project
     project = Project(
         id=uuid4(),
@@ -306,7 +312,7 @@ async def chat_with_project(test_db):
     )
     test_db.add(project)
     await test_db.flush()
-    
+
     # Create chat
     chat = Chat(
         id=uuid4(),
@@ -322,7 +328,7 @@ async def chat_with_project(test_db):
     )
     test_db.add(chat)
     await test_db.flush()
-    
+
     # Add messages
     system_message = Message(
         id=uuid4(),
@@ -333,7 +339,7 @@ async def chat_with_project(test_db):
         updated_at=datetime.utcnow(),
     )
     test_db.add(system_message)
-    
+
     user_message = Message(
         id=uuid4(),
         chat_id=chat.id,
@@ -343,14 +349,14 @@ async def chat_with_project(test_db):
         updated_at=datetime.utcnow(),
     )
     test_db.add(user_message)
-    
+
     await test_db.commit()
-    
+
     # Load relationships
     await test_db.refresh(chat)
     await test_db.refresh(project)
     await test_db.refresh(user)
-    
+
     return chat, project, user
 
 
@@ -358,22 +364,22 @@ async def chat_with_project(test_db):
 def mock_model_pricing():
     """
     Mock model pricing information for cost calculation tests.
-    
+
     Returns:
         Dictionary with model pricing data
     """
     return {
         "gpt-3.5-turbo": {
             "input_cost_per_token": Decimal("0.0000015"),  # $1.50 per 1M tokens
-            "output_cost_per_token": Decimal("0.000002"),   # $2.00 per 1M tokens
+            "output_cost_per_token": Decimal("0.000002"),  # $2.00 per 1M tokens
         },
         "gpt-4": {
-            "input_cost_per_token": Decimal("0.00003"),      # $30.00 per 1M tokens
-            "output_cost_per_token": Decimal("0.00006"),     # $60.00 per 1M tokens
+            "input_cost_per_token": Decimal("0.00003"),  # $30.00 per 1M tokens
+            "output_cost_per_token": Decimal("0.00006"),  # $60.00 per 1M tokens
         },
         "claude-3-sonnet": {
-            "input_cost_per_token": Decimal("0.000015"),     # $15.00 per 1M tokens
-            "output_cost_per_token": Decimal("0.000075"),    # $75.00 per 1M tokens
+            "input_cost_per_token": Decimal("0.000015"),  # $15.00 per 1M tokens
+            "output_cost_per_token": Decimal("0.000075"),  # $75.00 per 1M tokens
         },
     }
 
@@ -382,7 +388,7 @@ def mock_model_pricing():
 async def archived_chat(test_db):
     """
     Create an archived chat for testing archival functionality.
-    
+
     Returns:
         Archived Chat object
     """
@@ -400,7 +406,7 @@ async def archived_chat(test_db):
     )
     test_db.add(user)
     await test_db.flush()
-    
+
     # Create archived chat
     chat = Chat(
         id=uuid4(),
@@ -416,7 +422,7 @@ async def archived_chat(test_db):
     )
     test_db.add(chat)
     await test_db.flush()
-    
+
     # Add system message
     system_message = Message(
         id=uuid4(),
@@ -427,8 +433,8 @@ async def archived_chat(test_db):
         updated_at=datetime.utcnow(),
     )
     test_db.add(system_message)
-    
+
     await test_db.commit()
     await test_db.refresh(chat)
-    
+
     return chat

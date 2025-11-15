@@ -11,13 +11,13 @@ This module provides:
 import logging
 from typing import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy import text
 
 from ardha.core.config import settings
 
@@ -51,19 +51,19 @@ async_session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     FastAPI dependency that provides a database session.
-    
+
     Yields an async database session and handles proper cleanup.
     Automatically commits on success or rolls back on exception.
-    
+
     Usage:
         @router.get("/users")
         async def get_users(db: AsyncSession = Depends(get_db)):
             result = await db.execute(select(User))
             return result.scalars().all()
-    
+
     Yields:
         AsyncSession: Database session for the request
-    
+
     Raises:
         Exception: Any exception from database operations (after rollback)
     """
@@ -82,13 +82,13 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """
     Initialize database connection and verify connectivity.
-    
+
     This function should be called on application startup to:
     - Verify database connection works
     - Log connection status
-    
+
     Note: Does NOT create tables - use Alembic migrations for that.
-    
+
     Raises:
         Exception: If database connection fails
     """
@@ -105,7 +105,7 @@ async def init_db() -> None:
 async def close_db() -> None:
     """
     Close database connections gracefully.
-    
+
     This function should be called on application shutdown to:
     - Close all active connections
     - Release resources properly

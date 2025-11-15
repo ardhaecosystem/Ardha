@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from ardha.models.chat import Chat
     from ardha.models.memory import Memory
     from ardha.models.milestone import Milestone
+    from ardha.models.openspec import OpenSpecProposal
     from ardha.models.project_member import ProjectMember
     from ardha.models.task import Task
     from ardha.models.task_tag import TaskTag
@@ -142,6 +143,13 @@ class Project(BaseModel, Base):
 
     memories: Mapped[list["Memory"]] = relationship(
         "Memory", back_populates="project", cascade="all, delete-orphan", lazy="select"
+    )
+
+    openspec_proposals: Mapped[list["OpenSpecProposal"]] = relationship(
+        "OpenSpecProposal",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="select",
     )
 
     def __repr__(self) -> str:

@@ -254,7 +254,7 @@ frontend/src/
 ## Key Architectural Decisions
 
 ### 1. Backend-First Development Strategy
-**Decision**: Build complete backend API before frontend development  
+**Decision**: Build complete backend API before frontend development
 **Rationale**:
 - Stable API contracts enable parallel development
 - Faster debugging with direct API testing
@@ -268,7 +268,7 @@ frontend/src/
 - Frontend team starts after Week 3
 
 ### 2. Monorepo Structure
-**Decision**: Single repository with backend/ and frontend/ directories  
+**Decision**: Single repository with backend/ and frontend/ directories
 **Rationale**:
 - Shared configurations and tooling
 - Consistent versioning
@@ -281,7 +281,7 @@ frontend/src/
 - Independent package managers (Poetry, pnpm)
 
 ### 3. OpenSpec-Driven Development
-**Decision**: All features start with OpenSpec proposals  
+**Decision**: All features start with OpenSpec proposals
 **Rationale**:
 - Prevents "vibe coding" and scope creep
 - 59% fewer errors in implementation
@@ -295,7 +295,7 @@ frontend/src/
 - Archive when complete
 
 ### 4. Project-Based Memory System
-**Decision**: Three-tier memory (short/long/organizational)  
+**Decision**: Three-tier memory (short/long/organizational)
 **Rationale**:
 - AI learns from project history
 - Context retrieval efficiency
@@ -308,7 +308,7 @@ frontend/src/
 - Organizational: Qdrant (cross-project patterns)
 
 ### 5. LangGraph for AI Workflows
-**Decision**: Use LangGraph instead of naive LLM chaining  
+**Decision**: Use LangGraph instead of naive LLM chaining
 **Rationale**:
 - Deterministic control flow
 - State persistence for resumption
@@ -326,7 +326,7 @@ frontend/src/
 - Concurrent execution support with tracking
 
 ### 6. Complexity-Based Model Routing
-**Decision**: Auto-select AI model based on task complexity  
+**Decision**: Auto-select AI model based on task complexity
 **Rationale**:
 - Cost optimization (simple tasks use cheap models)
 - Quality for complex tasks
@@ -340,7 +340,7 @@ frontend/src/
 - User can override manually
 
 ### 7. Prompt Caching Strategy
-**Decision**: Mark large static context as cacheable  
+**Decision**: Mark large static context as cacheable
 **Rationale**:
 - 90% cost reduction on cached content
 - 5-minute cache duration
@@ -352,7 +352,7 @@ frontend/src/
 - Hierarchical context loading (5-15K vs 150-300K tokens)
 
 ### 8. Real-Time Collaboration (WebSocket)
-**Decision**: WebSocket for all real-time updates  
+**Decision**: WebSocket for all real-time updates
 **Rationale**:
 - Instant sync across users
 - Live code sharing in project chat
@@ -427,7 +427,7 @@ User Idea → Research Workflow (LangGraph) ✅ COMPLETE
 Chat Message → Summarize → Extract Decisions → Embed (sentence-transformers)
                                                   ↓
                                               Qdrant (vector database)
-                                                  
+
 Workflow Execution → Context Analysis → Pattern Extraction → Embed
                                                        ↓
                                                    Qdrant (semantic search)

@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from ardha.models.ai_usage import AIUsage
     from ardha.models.chat import Chat
     from ardha.models.memory import Memory
+    from ardha.models.openspec import OpenSpecProposal
     from ardha.models.project import Project
     from ardha.models.project_member import ProjectMember
     from ardha.models.task import Task
@@ -125,6 +126,20 @@ class User(Base, BaseModel):
 
     memories: Mapped[list["Memory"]] = relationship(
         "Memory", back_populates="user", cascade="all, delete-orphan", lazy="select"
+    )
+
+    created_openspec_proposals: Mapped[list["OpenSpecProposal"]] = relationship(
+        "OpenSpecProposal",
+        foreign_keys="OpenSpecProposal.created_by_user_id",
+        back_populates="created_by",
+        lazy="select",
+    )
+
+    approved_openspec_proposals: Mapped[list["OpenSpecProposal"]] = relationship(
+        "OpenSpecProposal",
+        foreign_keys="OpenSpecProposal.approved_by_user_id",
+        back_populates="approved_by",
+        lazy="select",
     )
 
     def __repr__(self) -> str:

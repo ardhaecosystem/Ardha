@@ -347,7 +347,7 @@ Example: "Fix undefined error in auth service"
 Load:
   - backend/services/auth_service.py (error location)
   - backend/repositories/user_repository.py (if called)
-  
+
 DO NOT LOAD: All other files!
 Strategy: Start minimal, expand only if needed
 ```
@@ -376,17 +376,17 @@ def determine_context(user_request: str) -> ContextLoadingPlan:
         package = "sequential"  # backend first, then frontend
     else:
         package = "ask_user"  # Ambiguous, ask for clarification
-    
+
     # 2. Detect task type
     task_type = classify_task_type(user_request)
-    
+
     # 3. Build file list (max 3-4 files)
     files = select_relevant_files(package, task_type, user_request)
-    
+
     # 4. Validate token budget
     if estimated_tokens(files) > 20000:
         files = prioritize_files(files, limit=4)
-    
+
     return ContextLoadingPlan(
         package=package,
         task_type=task_type,
@@ -550,10 +550,10 @@ def validate_context_loading():
         "Token budget OK (<20K)?": estimated_tokens < 20000,
         "Excluded other package?": not mixed_packages,
     }
-    
+
     if not all(checks.values()):
         return "STOP: Missing information or budget exceeded"
-    
+
     return "PROCEED: Context loading validated"
 ```
 
@@ -563,11 +563,11 @@ def validate_context_loading():
 
 **Effective Dynamic Context Loading:**
 
-✅ **95%+ tasks**: Correct package detected automatically  
-✅ **90%+ tasks**: Optimal file selection (3-4 files)  
-✅ **<20K tokens**: Average context size per task  
-✅ **<5% retries**: Due to incorrect context loaded  
-✅ **$0.05-0.10**: Average cost per task  
+✅ **95%+ tasks**: Correct package detected automatically
+✅ **90%+ tasks**: Optimal file selection (3-4 files)
+✅ **<20K tokens**: Average context size per task
+✅ **<5% retries**: Due to incorrect context loaded
+✅ **$0.05-0.10**: Average cost per task
 
 ---
 
@@ -589,7 +589,7 @@ Correct: Backend (authentication is backend concern)
 
 Learning: "authentication" always indicates backend,
           even with UI-like terms like "flow"
-          
+
 Action: Update backend indicators to prioritize
         authentication-related keywords
 ```
@@ -600,17 +600,17 @@ Action: Update backend indicators to prioritize
 
 This automation demonstrates:
 
-✨ **Intelligent Context Management** - AI makes smart decisions  
-✨ **Token Efficiency** - Automated optimization  
-✨ **User Experience** - No manual file selection needed  
-✨ **Error Handling** - Graceful fallback to clarification  
-✨ **Continuous Learning** - Patterns improve over time  
+✨ **Intelligent Context Management** - AI makes smart decisions
+✨ **Token Efficiency** - Automated optimization
+✨ **User Experience** - No manual file selection needed
+✨ **Error Handling** - Graceful fallback to clarification
+✨ **Continuous Learning** - Patterns improve over time
 
 **Learn more**: https://github.com/ardhaecosystem/Ardha
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: November 5, 2025  
-**Maintained By**: Ardha Development Team  
+**Version**: 1.0
+**Last Updated**: November 5, 2025
+**Maintained By**: Ardha Development Team
 **License**: MIT (Open Source)

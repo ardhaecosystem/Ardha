@@ -27,13 +27,13 @@ router = APIRouter(prefix="/auth/oauth", tags=["oauth"])
 # Request/Response Models
 class OAuthCodeRequest(BaseModel):
     """OAuth authorization code from provider callback."""
-    
+
     code: str = Field(..., description="Authorization code from OAuth provider")
 
 
 class TokenResponse(BaseModel):
     """JWT token response after successful OAuth."""
-    
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -62,20 +62,20 @@ async def github_oauth(
 ) -> TokenResponse:
     """
     Handle GitHub OAuth login/registration.
-    
+
     Flow:
     1. Exchange authorization code for GitHub access token
     2. Fetch user info from GitHub API
     3. Login existing user or create new user
     4. Return JWT tokens
-    
+
     Args:
         request: OAuth code from GitHub callback
         db: Database session
-        
+
     Returns:
         JWT access and refresh tokens with user data
-        
+
     Raises:
         HTTPException 400: Invalid authorization code
         HTTPException 500: GitHub API error or missing OAuth credentials
@@ -88,7 +88,7 @@ async def github_oauth(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="GitHub OAuth is not configured on this server",
         )
-    
+
     try:
         # Exchange code for access token
         async with httpx.AsyncClient() as client:
@@ -102,23 +102,23 @@ async def github_oauth(
                 headers={"Accept": "application/json"},
                 timeout=10.0,
             )
-            
+
             if token_response.status_code != 200:
                 logger.warning(f"GitHub token exchange failed: {token_response.text}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid authorization code",
                 )
-            
+
             token_data = token_response.json()
             access_token = token_data.get("access_token")
-            
+
             if not access_token:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Failed to obtain access token from GitHub",
                 )
-            
+
             # Fetch user info from GitHub
             user_response = await client.get(
                 GITHUB_USER_URL,
@@ -128,16 +128,16 @@ async def github_oauth(
                 },
                 timeout=10.0,
             )
-            
+
             if user_response.status_code != 200:
                 logger.error(f"GitHub user info fetch failed: {user_response.text}")
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail="Failed to fetch user info from GitHub",
                 )
-            
+
             github_user = user_response.json()
-    
+
     except httpx.TimeoutException:
         logger.error("GitHub API timeout")
         raise HTTPException(
@@ -150,24 +150,24 @@ async def github_oauth(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to communicate with GitHub API",
         )
-    
+
     # Extract user data
     github_id = str(github_user.get("id"))
     email = github_user.get("email")
     username = github_user.get("login", f"github_{github_id}")
     full_name = github_user.get("name")
     avatar_url = github_user.get("avatar_url")
-    
+
     if not email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="GitHub account must have a public email address",
         )
-    
+
     # Login or create user
     user_repository = UserRepository(db)
     auth_service = AuthService(user_repository)
-    
+
     try:
         user = await auth_service.oauth_login_or_create(
             provider="github",
@@ -177,16 +177,16 @@ async def github_oauth(
             full_name=full_name,
             avatar_url=avatar_url,
         )
-        
+
         # Commit the transaction
         await db.commit()
-        
+
         # Generate JWT tokens
         access_token_jwt = create_access_token(data={"sub": str(user.id)})
         refresh_token_jwt = create_refresh_token(data={"sub": str(user.id)})
-        
+
         logger.info(f"GitHub OAuth successful for user: {user.email}")
-        
+
         return TokenResponse(
             access_token=access_token_jwt,
             refresh_token=refresh_token_jwt,
@@ -199,7 +199,7 @@ async def github_oauth(
                 "avatar_url": user.avatar_url,
             },
         )
-    
+
     except Exception as e:
         await db.rollback()
         logger.error(f"Error during GitHub OAuth: {e}", exc_info=True)
@@ -222,20 +222,20 @@ async def google_oauth(
 ) -> TokenResponse:
     """
     Handle Google OAuth login/registration.
-    
+
     Flow:
     1. Exchange authorization code for Google access token
     2. Fetch user info from Google API
     3. Login existing user or create new user
     4. Return JWT tokens
-    
+
     Args:
         request: OAuth code from Google callback
         db: Database session
-        
+
     Returns:
         JWT access and refresh tokens with user data
-        
+
     Raises:
         HTTPException 400: Invalid authorization code
         HTTPException 500: Google API error or missing OAuth credentials
@@ -248,7 +248,7 @@ async def google_oauth(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Google OAuth is not configured on this server",
         )
-    
+
     try:
         # Exchange code for access token
         async with httpx.AsyncClient() as client:
@@ -264,23 +264,23 @@ async def google_oauth(
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 timeout=10.0,
             )
-            
+
             if token_response.status_code != 200:
                 logger.warning(f"Google token exchange failed: {token_response.text}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid authorization code",
                 )
-            
+
             token_data = token_response.json()
             access_token = token_data.get("access_token")
-            
+
             if not access_token:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Failed to obtain access token from Google",
                 )
-            
+
             # Fetch user info from Google
             user_response = await client.get(
                 GOOGLE_USER_URL,
@@ -289,16 +289,16 @@ async def google_oauth(
                 },
                 timeout=10.0,
             )
-            
+
             if user_response.status_code != 200:
                 logger.error(f"Google user info fetch failed: {user_response.text}")
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail="Failed to fetch user info from Google",
                 )
-            
+
             google_user = user_response.json()
-    
+
     except httpx.TimeoutException:
         logger.error("Google API timeout")
         raise HTTPException(
@@ -311,24 +311,24 @@ async def google_oauth(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to communicate with Google API",
         )
-    
+
     # Extract user data
     google_id = google_user.get("id")
     email = google_user.get("email")
     username = email.split("@")[0] if email else f"google_{google_id}"
     full_name = google_user.get("name")
     avatar_url = google_user.get("picture")
-    
+
     if not email or not google_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to retrieve required user information from Google",
         )
-    
+
     # Login or create user
     user_repository = UserRepository(db)
     auth_service = AuthService(user_repository)
-    
+
     try:
         user = await auth_service.oauth_login_or_create(
             provider="google",
@@ -338,16 +338,16 @@ async def google_oauth(
             full_name=full_name,
             avatar_url=avatar_url,
         )
-        
+
         # Commit the transaction
         await db.commit()
-        
+
         # Generate JWT tokens
         access_token_jwt = create_access_token(data={"sub": str(user.id)})
         refresh_token_jwt = create_refresh_token(data={"sub": str(user.id)})
-        
+
         logger.info(f"Google OAuth successful for user: {user.email}")
-        
+
         return TokenResponse(
             access_token=access_token_jwt,
             refresh_token=refresh_token_jwt,
@@ -360,7 +360,7 @@ async def google_oauth(
                 "avatar_url": user.avatar_url,
             },
         )
-    
+
     except Exception as e:
         await db.rollback()
         logger.error(f"Error during Google OAuth: {e}", exc_info=True)

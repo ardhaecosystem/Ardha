@@ -7,11 +7,13 @@ and configuration for the OpenRouter integration.
 
 from enum import Enum
 from typing import Dict, Optional
+
 from pydantic import BaseModel, Field
 
 
 class ModelProvider(str, Enum):
     """AI model providers."""
+
     ANTHROPIC = "anthropic"
     Z_AI = "z-ai"
     X_AI = "x-ai"
@@ -20,6 +22,7 @@ class ModelProvider(str, Enum):
 
 class ModelTier(str, Enum):
     """Model pricing tiers."""
+
     FREE = "free"
     BASIC = "basic"
     STANDARD = "standard"
@@ -28,7 +31,7 @@ class ModelTier(str, Enum):
 
 class AIModel(BaseModel):
     """AI model configuration with pricing."""
-    
+
     id: str = Field(description="OpenRouter model ID")
     name: str = Field(description="Display name for the model")
     provider: ModelProvider = Field(description="Model provider")
@@ -38,20 +41,22 @@ class AIModel(BaseModel):
     input_cost_per_million: float = Field(description="Cost per 1M input tokens in USD")
     output_cost_per_million: float = Field(description="Cost per 1M output tokens in USD")
     supports_streaming: bool = Field(default=True, description="Whether model supports streaming")
-    supports_function_calling: bool = Field(default=False, description="Whether model supports function calling")
+    supports_function_calling: bool = Field(
+        default=False, description="Whether model supports function calling"
+    )
     context_window: int = Field(description="Context window size in tokens")
     description: Optional[str] = Field(default=None, description="Model description")
-    
+
     @property
     def input_cost_per_token(self) -> float:
         """Cost per input token."""
         return self.input_cost_per_million / 1_000_000
-    
+
     @property
     def output_cost_per_token(self) -> float:
         """Cost per output token."""
         return self.output_cost_per_million / 1_000_000
-    
+
     def calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
         """Calculate total cost for given token usage."""
         input_cost = (input_tokens / 1_000_000) * self.input_cost_per_million
@@ -74,9 +79,8 @@ SUPPORTED_MODELS: Dict[str, AIModel] = {
         supports_streaming=True,
         supports_function_calling=True,
         context_window=200_000,
-        description="Most capable model for complex tasks, architecture decisions, and code reviews."
+        description="Most capable model for complex tasks, architecture decisions, and code reviews.",
     ),
-    
     # Z AI GLM
     "z-ai/glm-4.6": AIModel(
         id="z-ai/glm-4.6",
@@ -90,9 +94,8 @@ SUPPORTED_MODELS: Dict[str, AIModel] = {
         supports_streaming=True,
         supports_function_calling=True,
         context_window=128_000,
-        description="Cost-effective model for feature implementation and bug fixes."
+        description="Cost-effective model for feature implementation and bug fixes.",
     ),
-    
     # X AI Grok
     "x-ai/grok-code-fast-1": AIModel(
         id="x-ai/grok-code-fast-1",
@@ -106,9 +109,8 @@ SUPPORTED_MODELS: Dict[str, AIModel] = {
         supports_streaming=True,
         supports_function_calling=False,
         context_window=131_072,
-        description="Fast, budget-friendly model for simple tasks and quick fixes."
+        description="Fast, budget-friendly model for simple tasks and quick fixes.",
     ),
-    
     # Google Gemini
     "google/gemini-2.5-flash-lite": AIModel(
         id="google/gemini-2.5-flash-lite",
@@ -122,7 +124,7 @@ SUPPORTED_MODELS: Dict[str, AIModel] = {
         supports_streaming=True,
         supports_function_calling=True,
         context_window=1_048_576,
-        description="Free tier model for documentation, comments, and simple queries."
+        description="Free tier model for documentation, comments, and simple queries.",
     ),
 }
 
@@ -161,18 +163,18 @@ ROUTING_RECOMMENDATIONS = {
 def recommend_model(task_type: str, budget_conscious: bool = False) -> Optional[AIModel]:
     """Recommend a model based on task type and budget preference."""
     models = ROUTING_RECOMMENDATIONS.get(task_type, ["z-ai/glm-4.6"])
-    
+
     if budget_conscious:
         # Prefer cheaper models
         for model_id in models:
             model = get_model(model_id)
             if model and model.tier in [ModelTier.FREE, ModelTier.BASIC]:
                 return model
-    
+
     # Return first available model
     for model_id in models:
         model = get_model(model_id)
         if model:
             return model
-    
+
     return get_model("z-ai/glm-4.6")  # Default fallback

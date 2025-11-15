@@ -98,7 +98,7 @@ This workflow is designed for repetitive tasks that follow similar patterns and 
 - Implementing new API endpoints following established patterns
 - Adding new features that follow existing architecture
 
-Tasks are stored in the file `tasks.md` in the memory bank folder. The file is optional and can be empty. The file can store many tasks. 
+Tasks are stored in the file `tasks.md` in the memory bank folder. The file is optional and can be empty. The file can store many tasks.
 
 To execute Add Task workflow:
 
@@ -135,7 +135,7 @@ Example task entry:
 
 ### Regular Task Execution
 
-In the beginning of EVERY task I MUST read ALL memory bank files - this is not optional. 
+In the beginning of EVERY task I MUST read ALL memory bank files - this is not optional.
 
 The memory bank files are located in `.kilocode/rules/memory-bank` folder. If the folder doesn't exist or is empty, I will warn user about potential issues with the memory bank. I will include `[Memory Bank: Active]` at the beginning of my response if I successfully read the memory bank files, or `[Memory Bank: Missing]` if the folder doesn't exist or is empty. If memory bank is missing, I will warn the user about potential issues and suggest initialization. I should briefly summarize my understanding of the project to confirm alignment with the user's expectations, like:
 

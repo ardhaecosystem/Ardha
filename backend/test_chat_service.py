@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 async def test_chat_service():
     """Test ChatService with OpenRouter integration."""
-    
+
     async for db in get_db():
         chat_service = ChatService(db)
-        
+
         # Test 1: Create a chat
         print("🧪 Test 1: Creating chat...")
         try:
@@ -36,7 +36,7 @@ async def test_chat_service():
         except Exception as e:
             print(f"❌ Failed to create chat: {e}")
             return
-        
+
         # Test 2: Send a message
         print("\n🧪 Test 2: Sending message...")
         try:
@@ -49,13 +49,13 @@ async def test_chat_service():
             ):
                 response_chunks.append(chunk)
                 print(f"📝 Chunk: {chunk[:50]}...")
-            
+
             full_response = "".join(response_chunks)
             print(f"✅ Full response: {full_response}")
         except Exception as e:
             print(f"❌ Failed to send message: {e}")
             return
-        
+
         # Test 3: Get chat history
         print("\n🧪 Test 3: Getting chat history...")
         try:
@@ -70,7 +70,7 @@ async def test_chat_service():
                 print(f"  {i+1}. {msg.role.value}: {msg.content[:50]}...")
         except Exception as e:
             print(f"❌ Failed to get history: {e}")
-        
+
         # Test 4: Get chat summary
         print("\n🧪 Test 4: Getting chat summary...")
         try:
@@ -83,7 +83,7 @@ async def test_chat_service():
             print(f"   Total cost: ${summary['chat']['total_cost']}")
         except Exception as e:
             print(f"❌ Failed to get summary: {e}")
-        
+
         # Test 5: Archive chat
         print("\n🧪 Test 5: Archiving chat...")
         try:
@@ -94,36 +94,34 @@ async def test_chat_service():
             print(f"✅ Chat archived: {archived_chat.is_archived}")
         except Exception as e:
             print(f"❌ Failed to archive chat: {e}")
-        
+
         print("\n🎉 All tests completed!")
 
 
 async def test_openrouter_directly():
     """Test OpenRouter client directly."""
     print("\n🔧 Testing OpenRouter client directly...")
-    
+
     try:
         from ardha.core.openrouter import OpenRouterClient
-        from ardha.schemas.ai.requests import StreamingRequest, ChatMessage, MessageRole
-        
+        from ardha.schemas.ai.requests import ChatMessage, MessageRole, StreamingRequest
+
         client = OpenRouterClient()
-        
+
         # Test streaming
         request = StreamingRequest(
             model="z-ai/glm-4.6",
-            messages=[
-                ChatMessage(role=MessageRole.USER, content="What is 2+2?")
-            ],
+            messages=[ChatMessage(role=MessageRole.USER, content="What is 2+2?")],
             temperature=0.7,
             max_tokens=100,
         )
-        
+
         print("📡 Streaming response:")
         async for chunk in client.stream(request):
             print(f"   {chunk.content}")
-        
+
         print("✅ OpenRouter streaming test successful")
-        
+
     except Exception as e:
         print(f"❌ OpenRouter test failed: {e}")
 
@@ -131,10 +129,10 @@ async def test_openrouter_directly():
 async def main():
     """Run all tests."""
     print("🚀 Starting ChatService integration tests...\n")
-    
+
     # Test OpenRouter directly first
     await test_openrouter_directly()
-    
+
     # Test full ChatService
     await test_chat_service()
 

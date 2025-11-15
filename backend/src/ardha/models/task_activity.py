@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 class TaskActivity(Base, BaseModel):
     """
     Task activity model for comprehensive audit logging.
-    
+
     Tracks all changes to tasks including:
     - Status changes
     - Assignment changes
@@ -30,74 +30,74 @@ class TaskActivity(Base, BaseModel):
     - Comments
     - Git commit linking
     - Dependency changes
-    
+
     This provides a complete history of task evolution for:
     - Accountability (who changed what when)
     - Debugging (why did this task change?)
     - Metrics (how long in each status?)
     - AI learning (what patterns lead to success?)
     """
-    
+
     __tablename__ = "task_activities"
-    
+
     # ============= Primary Fields =============
-    
+
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    
+
     task_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("tasks.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    
+
     user_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         comment="User who performed this action (null if AI)",
     )
-    
+
     action: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
         comment="Action type (e.g., 'created', 'status_changed', 'assigned')",
     )
-    
+
     old_value: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="Previous value (JSON string for complex types)",
     )
-    
+
     new_value: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="New value (JSON string for complex types)",
     )
-    
+
     comment: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="Optional user comment explaining the change",
     )
-    
+
     # created_at inherited from BaseModel
-    
+
     # ============= Relationships =============
-    
+
     # Many-to-one: Task relationship
     task: Mapped["Task"] = relationship(
         "Task",
         back_populates="activities",
     )
-    
+
     # Many-to-one: User relationship
     user: Mapped["User | None"] = relationship(
         "User",
         back_populates="task_activities",
     )
-    
+
     def __repr__(self) -> str:
         """String representation of TaskActivity."""
         return f"<TaskActivity(task_id={self.task_id}, action={self.action})>"

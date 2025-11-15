@@ -60,11 +60,11 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 def _build_task_response(task: Any, check_blocked: bool = False) -> TaskResponse:
     """
     Build TaskResponse from Task model.
-    
+
     Args:
         task: Task model instance
         check_blocked: Whether to compute is_blocked field
-        
+
     Returns:
         TaskResponse with populated fields
     """
@@ -97,38 +97,41 @@ def _build_task_response(task: Any, check_blocked: bool = False) -> TaskResponse
         "created_at": task.created_at,
         "updated_at": task.updated_at,
     }
-    
+
     # Add assignee info if available
     if task.assignee:
         response_data["assignee_username"] = task.assignee.username
         response_data["assignee_full_name"] = task.assignee.full_name
-    
+
     # Add creator info if available
     if task.created_by:
         response_data["created_by_username"] = task.created_by.username
         response_data["created_by_full_name"] = task.created_by.full_name
-    
+
     # Add tags
     if task.tags:
-        response_data["tags"] = [
-            TaskTagResponse.model_validate(tag) for tag in task.tags
-        ]
-    
+        response_data["tags"] = [TaskTagResponse.model_validate(tag) for tag in task.tags]
+
     # Check if task is blocked (only if dependencies are already loaded)
     if check_blocked:
         try:
             # Check if dependencies are loaded (not lazy)
-            dependencies = task.dependencies if hasattr(task, '__dict__') and 'dependencies' in task.__dict__ else []
+            dependencies = (
+                task.dependencies
+                if hasattr(task, "__dict__") and "dependencies" in task.__dict__
+                else []
+            )
             if dependencies:
                 incomplete_deps = [
-                    dep for dep in dependencies
+                    dep
+                    for dep in dependencies
                     if dep.depends_on_task and dep.depends_on_task.status != "done"
                 ]
                 response_data["is_blocked"] = len(incomplete_deps) > 0
         except:
             # If accessing dependencies fails, assume not blocked
             response_data["is_blocked"] = False
-    
+
     return TaskResponse(**response_data)
 
 
@@ -150,23 +153,23 @@ async def create_task(
 ) -> TaskResponse:
     """
     Create a new task.
-    
+
     Requires project member permissions.
     Automatically generates unique identifier (e.g., ARD-001).
     """
     service = TaskService(db)
-    
+
     try:
         # Convert request to dict
         task_dict = task_data.model_dump(exclude_none=True, exclude={"tags", "depends_on"})
-        
+
         # Create task
         task = await service.create_task(
             project_id=project_id,
             task_data=task_dict,
             created_by_id=current_user.id,
         )
-        
+
         # Add tags if provided
         if task_data.tags:
             for tag_name in task_data.tags:
@@ -175,7 +178,7 @@ async def create_task(
                     user_id=current_user.id,
                     tag_name=tag_name,
                 )
-        
+
         # Add dependencies if provided
         if task_data.depends_on:
             for depends_on_id in task_data.depends_on:
@@ -188,10 +191,10 @@ async def create_task(
                 except CircularDependencyError:
                     # Skip circular dependencies, but don't fail entire request
                     logger.warning(f"Skipping circular dependency: {task.id} → {depends_on_id}")
-        
+
         # Commit transaction
         await db.commit()
-        
+
         # Reload task with all relationships using repository
         task = await service.repository.get_by_id(task.id)
         if not task:
@@ -199,9 +202,9 @@ async def create_task(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Task created but failed to reload",
             )
-        
+
         return _build_task_response(task)
-        
+
     except InsufficientTaskPermissionsError as e:
         await db.rollback()
         raise HTTPException(
@@ -242,7 +245,7 @@ async def list_project_tasks(
 ) -> TaskListResponse:
     """
     List tasks for a project with filtering and pagination.
-    
+
     Supports filtering by:
     - Status (multi-select)
     - Assignee
@@ -252,12 +255,12 @@ async def list_project_tasks(
     - Overdue status
     - Tags (multi-select)
     - Search (title/description/identifier)
-    
+
     Sorting options:
     - created_at, due_date, priority, status, updated_at
     """
     service = TaskService(db)
-    
+
     try:
         # Build filters
         filters = {
@@ -272,7 +275,7 @@ async def list_project_tasks(
             "sort_by": sort_by,
             "sort_order": sort_order,
         }
-        
+
         # Get tasks
         tasks, total = await service.get_project_tasks(
             project_id=project_id,
@@ -281,13 +284,13 @@ async def list_project_tasks(
             skip=skip,
             limit=limit,
         )
-        
+
         # Get status counts
         status_counts = await service.repository.count_by_status(project_id)
-        
+
         # Build responses
         task_responses = [_build_task_response(task, check_blocked=True) for task in tasks]
-        
+
         return TaskListResponse(
             tasks=task_responses,
             total=total,
@@ -295,7 +298,7 @@ async def list_project_tasks(
             limit=limit,
             status_counts=status_counts,
         )
-        
+
     except InsufficientTaskPermissionsError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -316,11 +319,11 @@ async def get_task(
 ) -> TaskResponse:
     """Get task by ID with all relationships loaded."""
     service = TaskService(db)
-    
+
     try:
         task = await service.get_task(task_id, current_user.id)
         return _build_task_response(task, check_blocked=True)
-        
+
     except TaskNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -347,7 +350,7 @@ async def get_task_by_identifier(
 ) -> TaskResponse:
     """Get task by identifier string."""
     service = TaskService(db)
-    
+
     # Get task
     task = await service.repository.get_by_identifier(project_id, identifier)
     if not task:
@@ -355,12 +358,12 @@ async def get_task_by_identifier(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Task {identifier} not found in project",
         )
-    
+
     try:
         # Verify permissions
         await service.get_task(task.id, current_user.id)
         return _build_task_response(task, check_blocked=True)
-        
+
     except InsufficientTaskPermissionsError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -382,28 +385,28 @@ async def update_task(
 ) -> TaskResponse:
     """Update task fields with activity logging."""
     service = TaskService(db)
-    
+
     try:
         # Convert request to dict
         update_dict = update_data.model_dump(exclude_none=True)
-        
+
         if not update_dict:
             # No changes, just return current task
             task = await service.get_task(task_id, current_user.id)
             return _build_task_response(task, check_blocked=True)
-        
+
         # Update task
         task = await service.update_task(
             task_id=task_id,
             user_id=current_user.id,
             update_data=update_dict,
         )
-        
+
         await db.commit()
         await db.refresh(task)
-        
+
         return _build_task_response(task, check_blocked=True)
-        
+
     except TaskNotFoundError:
         await db.rollback()
         raise HTTPException(
@@ -438,11 +441,11 @@ async def delete_task(
 ) -> dict[str, str]:
     """Delete task permanently."""
     service = TaskService(db)
-    
+
     try:
         success = await service.delete_task(task_id, current_user.id)
         await db.commit()
-        
+
         if success:
             return {"message": "Task deleted successfully"}
         else:
@@ -450,7 +453,7 @@ async def delete_task(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Task not found",
             )
-            
+
     except TaskNotFoundError:
         await db.rollback()
         raise HTTPException(
@@ -482,23 +485,23 @@ async def update_task_status(
 ) -> TaskResponse:
     """
     Update task status.
-    
+
     Validates status transitions and updates timestamps automatically:
     - todo → in_progress: Sets started_at
     - * → done: Sets completed_at
     - done → in_review: Clears completed_at
     """
     service = TaskService(db)
-    
+
     try:
         task = await service.update_status(
             task_id=task_id,
             user_id=current_user.id,
             new_status=status_update.status,
         )
-        
+
         await db.commit()
-        
+
         # Reload with relationships
         task = await service.repository.get_by_id(task_id)
         if not task:
@@ -506,9 +509,9 @@ async def update_task_status(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to reload task",
             )
-        
+
         return _build_task_response(task, check_blocked=True)
-        
+
     except TaskNotFoundError:
         await db.rollback()
         raise HTTPException(
@@ -543,16 +546,16 @@ async def assign_task(
 ) -> TaskResponse:
     """Assign task to a user."""
     service = TaskService(db)
-    
+
     try:
         task = await service.assign_task(
             task_id=task_id,
             user_id=current_user.id,
             assignee_id=assign_data.assignee_id,
         )
-        
+
         await db.commit()
-        
+
         # Reload with relationships
         task = await service.repository.get_by_id(task_id)
         if not task:
@@ -560,9 +563,9 @@ async def assign_task(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to reload task",
             )
-        
+
         return _build_task_response(task, check_blocked=True)
-        
+
     except TaskNotFoundError:
         await db.rollback()
         raise HTTPException(
@@ -590,12 +593,12 @@ async def unassign_task(
 ) -> TaskResponse:
     """Remove assignee from task."""
     service = TaskService(db)
-    
+
     try:
         task = await service.unassign_task(task_id, current_user.id)
-        
+
         await db.commit()
-        
+
         # Reload with relationships
         task = await service.repository.get_by_id(task_id)
         if not task:
@@ -603,9 +606,9 @@ async def unassign_task(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to reload task",
             )
-        
+
         return _build_task_response(task, check_blocked=True)
-        
+
     except TaskNotFoundError:
         await db.rollback()
         raise HTTPException(
@@ -638,33 +641,33 @@ async def add_task_dependency(
 ) -> TaskDependencyResponse:
     """Add dependency: task depends on another task."""
     service = TaskService(db)
-    
+
     try:
         dependency = await service.add_dependency(
             task_id=task_id,
             user_id=current_user.id,
             depends_on_task_id=dependency_data.depends_on_task_id,
         )
-        
+
         await db.commit()
         await db.refresh(dependency)
-        
+
         # Build response with task info (fetch task separately to avoid lazy loading)
         depends_on_task = await service.repository.get_by_id(dependency.depends_on_task_id)
-        
+
         response_data = {
             "id": dependency.id,
             "task_id": dependency.task_id,
             "depends_on_task_id": dependency.depends_on_task_id,
         }
-        
+
         if depends_on_task:
             response_data["depends_on_task_identifier"] = depends_on_task.identifier
             response_data["depends_on_task_title"] = depends_on_task.title
             response_data["depends_on_task_status"] = depends_on_task.status
-        
+
         return TaskDependencyResponse(**response_data)
-        
+
     except TaskNotFoundError as e:
         await db.rollback()
         raise HTTPException(
@@ -705,16 +708,16 @@ async def remove_task_dependency(
 ) -> dict[str, str]:
     """Remove dependency."""
     service = TaskService(db)
-    
+
     try:
         success = await service.remove_dependency(
             task_id=task_id,
             user_id=current_user.id,
             depends_on_task_id=depends_on_task_id,
         )
-        
+
         await db.commit()
-        
+
         if success:
             return {"message": "Dependency removed successfully"}
         else:
@@ -722,7 +725,7 @@ async def remove_task_dependency(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Dependency not found",
             )
-            
+
     except TaskNotFoundError:
         await db.rollback()
         raise HTTPException(
@@ -750,14 +753,14 @@ async def list_task_dependencies(
 ) -> list[TaskDependencyResponse]:
     """Get all tasks this task depends on."""
     service = TaskService(db)
-    
+
     try:
         # Verify access
         task = await service.get_task(task_id, current_user.id)
-        
+
         # Get dependencies
         dependencies = await service.repository.get_dependencies(task_id)
-        
+
         # Build responses
         responses = []
         for dep_task in dependencies:
@@ -766,7 +769,7 @@ async def list_task_dependencies(
                 (d for d in task.dependencies if d.depends_on_task_id == dep_task.id),
                 None,
             )
-            
+
             if dep_record:
                 responses.append(
                     TaskDependencyResponse(
@@ -778,9 +781,9 @@ async def list_task_dependencies(
                         depends_on_task_status=dep_task.status,
                     )
                 )
-        
+
         return responses
-        
+
     except TaskNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -811,7 +814,7 @@ async def add_task_tag(
 ) -> TaskResponse:
     """Add tag to task (creates tag if doesn't exist)."""
     service = TaskService(db)
-    
+
     try:
         task = await service.add_tag_to_task(
             task_id=task_id,
@@ -819,9 +822,9 @@ async def add_task_tag(
             tag_name=tag_data.name,
             color=tag_data.color,
         )
-        
+
         await db.commit()
-        
+
         # Reload with relationships
         task = await service.repository.get_by_id(task_id)
         if not task:
@@ -829,9 +832,9 @@ async def add_task_tag(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to reload task",
             )
-        
+
         return _build_task_response(task, check_blocked=True)
-        
+
     except TaskNotFoundError:
         await db.rollback()
         raise HTTPException(
@@ -860,16 +863,16 @@ async def remove_task_tag(
 ) -> TaskResponse:
     """Remove tag from task."""
     service = TaskService(db)
-    
+
     try:
         task = await service.remove_tag_from_task(
             task_id=task_id,
             user_id=current_user.id,
             tag_id=tag_id,
         )
-        
+
         await db.commit()
-        
+
         # Reload with relationships
         task = await service.repository.get_by_id(task_id)
         if not task:
@@ -877,9 +880,9 @@ async def remove_task_tag(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to reload task",
             )
-        
+
         return _build_task_response(task, check_blocked=True)
-        
+
     except TaskNotFoundError:
         await db.rollback()
         raise HTTPException(
@@ -911,14 +914,14 @@ async def get_task_activities(
 ) -> list[TaskActivityResponse]:
     """Get activity log for task."""
     service = TaskService(db)
-    
+
     try:
         # Verify access
         await service.get_task(task_id, current_user.id)
-        
+
         # Get activities
         activities = await service.repository.get_task_activities(task_id, limit)
-        
+
         # Build responses
         responses = []
         for activity in activities:
@@ -931,15 +934,15 @@ async def get_task_activities(
                 "created_at": activity.created_at,
                 "user_id": activity.user_id,
             }
-            
+
             if activity.user:
                 response_data["user_username"] = activity.user.username
                 response_data["user_full_name"] = activity.user.full_name
-            
+
             responses.append(TaskActivityResponse(**response_data))
-        
+
         return responses
-        
+
     except TaskNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -968,7 +971,7 @@ async def get_task_board(
 ) -> TaskBoardResponse:
     """Get board view with tasks grouped by status."""
     service = TaskService(db)
-    
+
     try:
         # Get all tasks (no pagination for board view)
         tasks, total = await service.get_project_tasks(
@@ -978,10 +981,10 @@ async def get_task_board(
             skip=0,
             limit=1000,  # Board shows all tasks
         )
-        
+
         # Get status counts
         counts = await service.repository.count_by_status(project_id)
-        
+
         # Group by status
         grouped: dict[str, list[TaskResponse]] = {
             "todo": [],
@@ -990,12 +993,12 @@ async def get_task_board(
             "done": [],
             "cancelled": [],
         }
-        
+
         for task in tasks:
             task_response = _build_task_response(task, check_blocked=True)
             if task.status in grouped:
                 grouped[task.status].append(task_response)
-        
+
         return TaskBoardResponse(
             todo=grouped["todo"],
             in_progress=grouped["in_progress"],
@@ -1005,7 +1008,7 @@ async def get_task_board(
             total=total,
             counts=counts,
         )
-        
+
     except InsufficientTaskPermissionsError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1028,21 +1031,21 @@ async def get_task_calendar(
 ) -> TaskCalendarResponse:
     """Get calendar view with tasks grouped by due date."""
     service = TaskService(db)
-    
+
     try:
         # Default date range: 30 days back to 90 days forward
         if not start_date:
             start_date = datetime.utcnow() - timedelta(days=30)
         if not end_date:
             end_date = datetime.utcnow() + timedelta(days=90)
-        
+
         # Get tasks with due dates in range
         filters = {
             "has_due_date": True,
             "sort_by": "due_date",
             "sort_order": "asc",
         }
-        
+
         tasks, total = await service.get_project_tasks(
             project_id=project_id,
             user_id=current_user.id,
@@ -1050,23 +1053,23 @@ async def get_task_calendar(
             skip=0,
             limit=1000,  # Calendar shows all in range
         )
-        
+
         # Group by date
         tasks_by_date: dict[str, list[TaskResponse]] = defaultdict(list)
-        
+
         for task in tasks:
             if task.due_date and start_date <= task.due_date <= end_date:
                 date_key = task.due_date.date().isoformat()
                 task_response = _build_task_response(task)
                 tasks_by_date[date_key].append(task_response)
-        
+
         return TaskCalendarResponse(
             tasks_by_date=dict(tasks_by_date),
             total=len([t for tasks in tasks_by_date.values() for t in tasks]),
             date_range_start=start_date,
             date_range_end=end_date,
         )
-        
+
     except InsufficientTaskPermissionsError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1087,14 +1090,14 @@ async def get_task_timeline(
 ) -> TaskTimelineResponse:
     """Get timeline view with tasks and dependencies."""
     service = TaskService(db)
-    
+
     try:
         # Get tasks with dependencies loaded
         filters = {
             "sort_by": "created_at",
             "sort_order": "asc",
         }
-        
+
         tasks, total = await service.get_project_tasks(
             project_id=project_id,
             user_id=current_user.id,
@@ -1102,33 +1105,33 @@ async def get_task_timeline(
             skip=0,
             limit=1000,  # Timeline shows all
         )
-        
+
         # Build responses
         task_responses = [_build_task_response(task, check_blocked=True) for task in tasks]
-        
+
         # Find date range
         earliest_date = None
         latest_date = None
-        
+
         for task in tasks:
             if task.created_at:
                 if not earliest_date or task.created_at < earliest_date:
                     earliest_date = task.created_at
-            
+
             if task.due_date:
                 if not latest_date or task.due_date > latest_date:
                     latest_date = task.due_date
             elif task.created_at:
                 if not latest_date or task.created_at > latest_date:
                     latest_date = task.created_at
-        
+
         return TaskTimelineResponse(
             tasks=task_responses,
             total=total,
             earliest_date=earliest_date,
             latest_date=latest_date,
         )
-        
+
     except InsufficientTaskPermissionsError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

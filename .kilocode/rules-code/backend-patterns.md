@@ -151,11 +151,11 @@ async def create_user(
 ) -> UserResponse:
     """
     Create a new user account.
-    
+
     - **email**: Valid email address (unique)
     - **password**: Minimum 8 characters
     - **full_name**: User's display name
-    
+
     Returns the created user (excluding password).
     """
     service = UserService(db)
@@ -204,14 +204,14 @@ from app.core.security.password import get_password_hash, verify_password
 
 class UserService:
     """Business logic for user management."""
-    
+
     def __init__(self, db: AsyncSession):
         self.repository = UserRepository(db)
-    
+
     async def create_user(self, user_data: UserCreate) -> User:
         """
         Create a new user with hashed password.
-        
+
         Raises:
             HTTPException: If email already exists
         """
@@ -222,33 +222,33 @@ class UserService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered"
             )
-        
+
         # Hash password
         hashed_password = get_password_hash(user_data.password)
-        
+
         # Create user
         user = await self.repository.create(
             email=user_data.email,
             full_name=user_data.full_name,
             hashed_password=hashed_password,
         )
-        
+
         return user
-    
+
     async def authenticate(self, email: str, password: str) -> User | None:
         """
         Authenticate user with email and password.
-        
+
         Returns:
             User if authenticated, None otherwise
         """
         user = await self.repository.get_by_email(email)
         if not user:
             return None
-        
+
         if not verify_password(password, user.hashed_password):
             return None
-        
+
         return user
 ```
 
@@ -279,10 +279,10 @@ from app.models.user import User
 
 class UserRepository:
     """Data access layer for User model."""
-    
+
     def __init__(self, db: AsyncSession):
         self.db = db
-    
+
     async def create(
         self,
         email: str,
@@ -299,25 +299,25 @@ class UserRepository:
         await self.db.commit()
         await self.db.refresh(user)
         return user
-    
+
     async def get_by_email(self, email: str) -> Optional[User]:
         """Get user by email address."""
         stmt = select(User).where(User.email == email)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
-    
+
     async def get_by_id(self, user_id: int) -> Optional[User]:
         """Get user by ID."""
         stmt = select(User).where(User.id == user_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
-    
+
     async def update(self, user: User, **kwargs) -> User:
         """Update user fields."""
         for key, value in kwargs.items():
             if hasattr(user, key):
                 setattr(user, key, value)
-        
+
         await self.db.commit()
         await self.db.refresh(user)
         return user
@@ -473,7 +473,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     full_name: str
     created_at: datetime
-    
+
     model_config = {"from_attributes": True}  # Enable ORM mode
 ```
 
@@ -526,10 +526,10 @@ async def test_create_user_success(mock_db_session):
         password="SecurePass123!",
         full_name="Test User"
     )
-    
+
     # Act
     user = await service.create_user(user_data)
-    
+
     # Assert
     assert user.email == "test@example.com"
     assert user.full_name == "Test User"
@@ -552,10 +552,10 @@ async def test_register_user(client: AsyncClient):
         "password": "SecurePass123!",
         "full_name": "New User"
     }
-    
+
     # Act
     response = await client.post("/api/v1/users/", json=user_data)
-    
+
     # Assert
     assert response.status_code == 201
     data = response.json()
@@ -616,18 +616,18 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # Database
     database_url: str
-    
+
     # Redis
     redis_url: str
-    
+
     # JWT
     secret_key: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
-    
+
     # OpenRouter
     openrouter_api_key: str
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -693,17 +693,17 @@ poetry run ruff check .
 
 These patterns demonstrate:
 
-✨ **Clean Architecture** - Clear separation of concerns  
-✨ **Type Safety** - Full type hints for IDE support  
-✨ **Async Performance** - Non-blocking I/O throughout  
-✨ **Testability** - Every layer independently testable  
-✨ **Documentation** - OpenAPI specs + code comments  
+✨ **Clean Architecture** - Clear separation of concerns
+✨ **Type Safety** - Full type hints for IDE support
+✨ **Async Performance** - Non-blocking I/O throughout
+✨ **Testability** - Every layer independently testable
+✨ **Documentation** - OpenAPI specs + code comments
 
 **Learn more**: https://github.com/ardhaecosystem/Ardha
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: November 5, 2025  
-**Maintained By**: Ardha Development Team  
+**Version**: 1.0
+**Last Updated**: November 5, 2025
+**Maintained By**: Ardha Development Team
 **License**: MIT (Open Source)

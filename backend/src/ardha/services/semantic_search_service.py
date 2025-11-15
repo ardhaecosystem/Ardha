@@ -12,7 +12,6 @@ import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-
 from ..core.qdrant import QdrantService, get_qdrant_service
 from ..services.embedding_service import LocalEmbeddingService, get_embedding_service
 

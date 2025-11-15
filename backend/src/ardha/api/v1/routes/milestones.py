@@ -58,9 +58,9 @@ async def create_milestone(
 ) -> MilestoneResponse:
     """
     Create a new milestone.
-    
+
     **Permissions:** Requires project member access (member role or higher).
-    
+
     **Request Body:**
     - **name**: Milestone display name (required, max 255 chars)
     - **description**: Optional detailed description
@@ -69,7 +69,7 @@ async def create_milestone(
     - **start_date**: Optional start date
     - **due_date**: Optional target completion date
     - **order**: Display order (default: appended to end)
-    
+
     **Returns:**
     - **201 Created**: Milestone created successfully
     - **400 Bad Request**: Invalid data
@@ -83,12 +83,12 @@ async def create_milestone(
             project_id,
             current_user.id,
         )
-        
+
         # Add computed fields
         response = MilestoneResponse.model_validate(milestone)
         response.is_overdue = milestone.is_overdue
         response.days_remaining = milestone.days_remaining
-        
+
         return response
     except InsufficientMilestonePermissionsError as e:
         logger.warning(f"Permission denied creating milestone: {e}")
@@ -126,14 +126,14 @@ async def list_project_milestones(
 ) -> MilestoneListResponse:
     """
     List all milestones for a project.
-    
+
     **Permissions:** Requires project member access.
-    
+
     **Query Parameters:**
     - **skip**: Pagination offset (default: 0)
     - **limit**: Maximum results per page (default: 100, max: 100)
     - **status**: Filter by status (optional)
-    
+
     **Returns:**
     - **200 OK**: List of milestones with total count
     - **403 Forbidden**: User lacks permissions
@@ -141,12 +141,12 @@ async def list_project_milestones(
     """
     try:
         service = MilestoneService(db)
-        
+
         if milestone_status:
             # Filter by status
             milestones = await service.repository.get_by_status(project_id, milestone_status)
             # Apply pagination manually
-            milestones = milestones[skip:skip + limit]
+            milestones = milestones[skip : skip + limit]
         else:
             milestones = await service.get_project_milestones(
                 project_id,
@@ -154,13 +154,13 @@ async def list_project_milestones(
                 skip=skip,
                 limit=limit,
             )
-        
+
         # Get total count
         all_milestones = await service.repository.get_project_milestones(
             project_id, skip=0, limit=10000
         )
         total = len(all_milestones)
-        
+
         # Add computed fields
         responses = []
         for milestone in milestones:
@@ -168,7 +168,7 @@ async def list_project_milestones(
             response.is_overdue = milestone.is_overdue
             response.days_remaining = milestone.days_remaining
             responses.append(response)
-        
+
         return MilestoneListResponse(milestones=responses, total=total)
     except InsufficientMilestonePermissionsError as e:
         logger.warning(f"Permission denied listing milestones: {e}")
@@ -197,9 +197,9 @@ async def get_milestone(
 ) -> MilestoneResponse:
     """
     Get milestone by ID.
-    
+
     **Permissions:** Requires project member access.
-    
+
     **Returns:**
     - **200 OK**: Milestone details
     - **403 Forbidden**: User lacks permissions
@@ -208,12 +208,12 @@ async def get_milestone(
     try:
         service = MilestoneService(db)
         milestone = await service.get_milestone(milestone_id, current_user.id)
-        
+
         # Add computed fields
         response = MilestoneResponse.model_validate(milestone)
         response.is_overdue = milestone.is_overdue
         response.days_remaining = milestone.days_remaining
-        
+
         return response
     except MilestoneNotFoundError as e:
         logger.warning(f"Milestone not found: {e}")
@@ -249,9 +249,9 @@ async def update_milestone(
 ) -> MilestoneResponse:
     """
     Update milestone.
-    
+
     **Permissions:** Requires project member access.
-    
+
     **Request Body:** All fields optional
     - **name**: New milestone name
     - **description**: New description
@@ -261,7 +261,7 @@ async def update_milestone(
     - **due_date**: New due date
     - **progress_percentage**: New progress (0-100)
     - **order**: New display order
-    
+
     **Returns:**
     - **200 OK**: Updated milestone
     - **400 Bad Request**: Invalid data
@@ -275,12 +275,12 @@ async def update_milestone(
             current_user.id,
             update_data,
         )
-        
+
         # Add computed fields
         response = MilestoneResponse.model_validate(milestone)
         response.is_overdue = milestone.is_overdue
         response.days_remaining = milestone.days_remaining
-        
+
         return response
     except MilestoneNotFoundError as e:
         logger.warning(f"Milestone not found: {e}")
@@ -314,11 +314,11 @@ async def delete_milestone(
 ) -> dict:
     """
     Delete a milestone.
-    
+
     **Permissions:** Requires owner or admin role.
-    
+
     **Protection:** Cannot delete milestone with linked tasks.
-    
+
     **Returns:**
     - **200 OK**: Milestone deleted successfully
     - **400 Bad Request**: Milestone has linked tasks
@@ -372,20 +372,20 @@ async def update_milestone_status(
 ) -> MilestoneResponse:
     """
     Update milestone status.
-    
+
     **Permissions:** Requires project member access.
-    
+
     **Features:**
     - Validates status transitions (e.g., not_started → in_progress)
     - Automatically sets completed_at when status → completed
     - Clears completed_at when leaving completed status
-    
+
     **Valid Transitions:**
     - not_started → in_progress, cancelled
     - in_progress → completed, not_started, cancelled
     - completed → in_progress (reopen)
     - cancelled → not_started (uncancel)
-    
+
     **Returns:**
     - **200 OK**: Status updated successfully
     - **400 Bad Request**: Invalid status transition
@@ -399,12 +399,12 @@ async def update_milestone_status(
             current_user.id,
             status_data.status,
         )
-        
+
         # Add computed fields
         response = MilestoneResponse.model_validate(milestone)
         response.is_overdue = milestone.is_overdue
         response.days_remaining = milestone.days_remaining
-        
+
         return response
     except MilestoneNotFoundError as e:
         logger.warning(f"Milestone not found: {e}")
@@ -449,12 +449,12 @@ async def update_milestone_progress(
 ) -> MilestoneResponse:
     """
     Manually update milestone progress.
-    
+
     **Permissions:** Requires project member access.
-    
+
     **Request Body:**
     - **progress_percentage**: Progress value (0-100)
-    
+
     **Returns:**
     - **200 OK**: Progress updated successfully
     - **400 Bad Request**: Invalid progress value
@@ -468,12 +468,12 @@ async def update_milestone_progress(
             current_user.id,
             progress_data.progress_percentage,
         )
-        
+
         # Add computed fields
         response = MilestoneResponse.model_validate(milestone)
         response.is_overdue = milestone.is_overdue
         response.days_remaining = milestone.days_remaining
-        
+
         return response
     except MilestoneNotFoundError as e:
         logger.warning(f"Milestone not found: {e}")
@@ -514,13 +514,13 @@ async def recalculate_milestone_progress(
 ) -> MilestoneResponse:
     """
     Auto-calculate progress from task completion.
-    
+
     **Permissions:** No permission check (system operation).
-    
+
     **Calculation:**
     - progress = (completed_tasks / total_tasks) * 100
     - Returns 0 if no tasks exist
-    
+
     **Returns:**
     - **200 OK**: Progress recalculated successfully
     - **404 Not Found**: Milestone not found
@@ -528,12 +528,12 @@ async def recalculate_milestone_progress(
     try:
         service = MilestoneService(db)
         milestone = await service.recalculate_progress(milestone_id)
-        
+
         # Add computed fields
         response = MilestoneResponse.model_validate(milestone)
         response.is_overdue = milestone.is_overdue
         response.days_remaining = milestone.days_remaining
-        
+
         return response
     except MilestoneNotFoundError as e:
         logger.warning(f"Milestone not found: {e}")
@@ -566,16 +566,16 @@ async def reorder_milestone(
 ) -> MilestoneResponse:
     """
     Change milestone order (for drag-drop UI).
-    
+
     **Permissions:** Requires project member access.
-    
+
     **Features:**
     - Automatically shifts other milestones to make room
     - Maintains unique order within project
-    
+
     **Request Body:**
     - **new_order**: New order value (>= 0)
-    
+
     **Returns:**
     - **200 OK**: Milestone reordered successfully
     - **400 Bad Request**: Invalid order value
@@ -589,12 +589,12 @@ async def reorder_milestone(
             current_user.id,
             reorder_data.new_order,
         )
-        
+
         # Add computed fields
         response = MilestoneResponse.model_validate(milestone)
         response.is_overdue = milestone.is_overdue
         response.days_remaining = milestone.days_remaining
-        
+
         return response
     except MilestoneNotFoundError as e:
         logger.warning(f"Milestone not found: {e}")
@@ -638,16 +638,16 @@ async def get_milestone_summary(
 ) -> MilestoneSummaryResponse:
     """
     Get milestone summary with statistics.
-    
+
     **Permissions:** Requires project member access.
-    
+
     **Returns:**
     - **milestone**: Full milestone data
     - **task_stats**: Task counts by status (todo, in_progress, in_review, done, cancelled)
     - **total_tasks**: Total number of tasks
     - **completed_tasks**: Number of completed tasks
     - **auto_progress**: Auto-calculated progress from task completion
-    
+
     **Returns:**
     - **200 OK**: Milestone summary
     - **403 Forbidden**: User lacks permissions
@@ -656,19 +656,19 @@ async def get_milestone_summary(
     try:
         service = MilestoneService(db)
         summary = await service.get_milestone_summary(milestone_id, current_user.id)
-        
+
         # Add computed fields to milestone
-        milestone = summary['milestone']
+        milestone = summary["milestone"]
         milestone_response = MilestoneResponse.model_validate(milestone)
         milestone_response.is_overdue = milestone.is_overdue
         milestone_response.days_remaining = milestone.days_remaining
-        
+
         return MilestoneSummaryResponse(
             milestone=milestone_response,
-            task_stats=summary['task_stats'],
-            total_tasks=summary['total_tasks'],
-            completed_tasks=summary['completed_tasks'],
-            auto_progress=summary['auto_progress'],
+            task_stats=summary["task_stats"],
+            total_tasks=summary["total_tasks"],
+            completed_tasks=summary["completed_tasks"],
+            auto_progress=summary["auto_progress"],
         )
     except MilestoneNotFoundError as e:
         logger.warning(f"Milestone not found: {e}")
@@ -703,14 +703,14 @@ async def get_project_roadmap(
 ) -> list[MilestoneResponse]:
     """
     Get project roadmap (all milestones).
-    
+
     **Permissions:** Requires project member access.
-    
+
     **Perfect for:**
     - Roadmap/timeline visualization
     - Gantt chart views
     - Project planning dashboards
-    
+
     **Returns:**
     - **200 OK**: List of all milestones ordered by order/dates
     - **403 Forbidden**: User lacks permissions
@@ -719,7 +719,7 @@ async def get_project_roadmap(
     try:
         service = MilestoneService(db)
         milestones = await service.get_project_roadmap(project_id, current_user.id)
-        
+
         # Add computed fields
         responses = []
         for milestone in milestones:
@@ -727,7 +727,7 @@ async def get_project_roadmap(
             response.is_overdue = milestone.is_overdue
             response.days_remaining = milestone.days_remaining
             responses.append(response)
-        
+
         return responses
     except InsufficientMilestonePermissionsError as e:
         logger.warning(f"Permission denied getting roadmap: {e}")
@@ -757,17 +757,17 @@ async def get_upcoming_milestones(
 ) -> list[MilestoneResponse]:
     """
     Get milestones due within N days.
-    
+
     **Permissions:** Requires project member access.
-    
+
     **Query Parameters:**
     - **days**: Number of days to look ahead (default: 30, max: 365)
-    
+
     **Excludes:**
     - Completed milestones
     - Cancelled milestones
     - Milestones without due dates
-    
+
     **Returns:**
     - **200 OK**: List of upcoming milestones ordered by due date
     - **403 Forbidden**: User lacks permissions
@@ -780,7 +780,7 @@ async def get_upcoming_milestones(
             current_user.id,
             days,
         )
-        
+
         # Add computed fields
         responses = []
         for milestone in milestones:
@@ -788,7 +788,7 @@ async def get_upcoming_milestones(
             response.is_overdue = milestone.is_overdue
             response.days_remaining = milestone.days_remaining
             responses.append(response)
-        
+
         return responses
     except InsufficientMilestonePermissionsError as e:
         logger.warning(f"Permission denied getting upcoming milestones: {e}")

@@ -3,10 +3,10 @@
 ## Project Overview
 **Ardha** is the world's first truly unified AI-native project management and development platform that eliminates the artificial boundary between planning and execution.
 
-**Repository:** `/home/veda/ardha-projects/Ardha`  
-**GitHub:** https://github.com/ardhaecosystem/Ardha  
-**License:** MIT (Open Source)  
-**Current Phase:** Pre-Development (Infrastructure Complete)  
+**Repository:** `/home/veda/ardha-projects/Ardha`
+**GitHub:** https://github.com/ardhaecosystem/Ardha
+**License:** MIT (Open Source)
+**Current Phase:** Pre-Development (Infrastructure Complete)
 **Target MVP:** February 2026 (4 months / 20 weeks)
 
 ## Core Problem

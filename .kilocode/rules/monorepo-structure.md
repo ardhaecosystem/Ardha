@@ -1,7 +1,7 @@
 # Ardha Monorepo Navigation Rules
 
 > **Purpose**: Establish clear package boundaries and prevent wasteful context loading in AI-assisted development.
-> 
+>
 > **Why This Matters**: Without these rules, AI loads the entire 50K+ LOC monorepo (150K-300K tokens) on every request. With these rules, AI loads only relevant context (5-15K tokens) - **saving 95% of tokens!**
 >
 > **Open-Source Note**: These rules demonstrate best practices for AI-assisted monorepo development. Feel free to adapt for your own projects!
@@ -187,7 +187,7 @@ openspec/changes/add-chat-interface/
     └── frontend/
         └── chat-ui-spec.md
 ```
-**Context Loading**: 
+**Context Loading**:
 - During backend tasks: Load only backend/ files
 - During frontend tasks: Load only frontend/ files
 - During proposal review: Load specs only (no implementation)
@@ -368,9 +368,9 @@ Before processing any task, AI should validate:
 
 These rules are part of **Ardha's commitment to open-source excellence**. We're demonstrating:
 
-✨ **Token-efficient AI development** - How to stay within budget constraints  
-✨ **Monorepo best practices** - Clear boundaries prevent architectural drift  
-✨ **Reproducible workflows** - Other projects can adapt these rules  
+✨ **Token-efficient AI development** - How to stay within budget constraints
+✨ **Monorepo best practices** - Clear boundaries prevent architectural drift
+✨ **Reproducible workflows** - Other projects can adapt these rules
 ✨ **Transparent AI usage** - Every decision documented and explainable
 
 **Learn more about Ardha**: https://github.com/ardhaecosystem/Ardha
@@ -386,7 +386,7 @@ These rules are part of **Ardha's commitment to open-source excellence**. We're 
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: November 5, 2025  
-**Maintained By**: Ardha Development Team  
+**Version**: 1.0
+**Last Updated**: November 5, 2025
+**Maintained By**: Ardha Development Team
 **License**: MIT (Open Source)

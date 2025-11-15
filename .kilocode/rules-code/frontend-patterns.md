@@ -138,7 +138,7 @@ import { ProjectCard } from './_components/ProjectCard'
 
 export default async function DashboardPage() {
   const projects = await getProjects() // Server-side fetch
-  
+
   return (
     <div className="grid gap-4">
       <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -157,11 +157,11 @@ import { useEffect, useState } from 'react'
 
 export default function DashboardPage() {
   const [projects, setProjects] = useState([])
-  
+
   useEffect(() => {
     fetch('/api/projects').then(/* ... */)
   }, [])
-  
+
   // This defeats Server Component benefits!
 }
 ```
@@ -234,7 +234,7 @@ import { ProjectCard } from '@/components/ProjectCard'
 export default async function ProjectsPage() {
   // Direct async/await in component
   const projects = await getProjects()
-  
+
   return (
     <div className="container py-8">
       <h1 className="text-3xl font-bold mb-6">Projects</h1>
@@ -272,7 +272,7 @@ import { createProject } from '@/lib/api/projects'
 export function CreateProjectButton() {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  
+
   const handleCreate = async () => {
     setIsLoading(true)
     try {
@@ -285,13 +285,13 @@ export function CreateProjectButton() {
       setIsLoading(false)
     }
   }
-  
+
   return (
     <>
       <Button onClick={() => setIsOpen(true)}>
         Create Project
       </Button>
-      
+
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent>
           <DialogHeader>
@@ -332,11 +332,11 @@ export default async function ProjectDetailPage({
 }) {
   // Fetch on server
   const project = await getProject(params.id)
-  
+
   return (
     <div className="container py-8">
       <h1 className="text-3xl font-bold mb-6">{project.name}</h1>
-      
+
       {/* Pass data to Client Component */}
       <TaskBoard projectId={project.id} initialTasks={project.tasks} />
     </div>
@@ -357,12 +357,12 @@ interface TaskBoardProps {
 
 export function TaskBoard({ projectId, initialTasks }: TaskBoardProps) {
   const [tasks, setTasks] = useState(initialTasks)
-  
+
   // Client-side interactions
   const handleDragEnd = (result: any) => {
     // Update task status
   }
-  
+
   return (
     <div className="grid grid-cols-4 gap-4">
       {/* Kanban columns */}
@@ -403,13 +403,13 @@ export function TaskBoard({ projectId, initialTasks }: TaskBoardProps) {
   /* Primary (Purple brand color) */
   --primary: 262.1 83.3% 57.8%;
   --primary-foreground: 210 20% 98%;
-  
+
   /* Neutrals (LCH color space - perfect grays) */
   --neutral-0: 0 0% 100%;    /* Pure white */
   --neutral-50: 210 20% 98%;
   --neutral-100: 214 32% 91%;
   --neutral-900: 222 47% 11%;
-  
+
   /* Semantic colors */
   --success: 142 76% 36%;
   --error: 0 84% 60%;
@@ -428,7 +428,7 @@ export function TaskBoard({ projectId, initialTasks }: TaskBoardProps) {
 ```tsx
 // ✅ CORRECT: Using spacing scale
 <div className="p-4 mb-6 gap-8">  {/* 16px, 24px, 32px */}
-  
+
 // ❌ INCORRECT: Arbitrary values
 <div className="p-[13px] mb-[25px]">
 ```
@@ -450,7 +450,7 @@ async function getStats() {
 
 export default async function DashboardPage() {
   const stats = await getStats()
-  
+
   return <StatsDisplay stats={stats} />
 }
 ```
@@ -470,10 +470,10 @@ export function LiveStats() {
   const { data, error, isLoading } = useSWR('/api/v1/stats', fetcher, {
     refreshInterval: 5000,  // Refresh every 5s
   })
-  
+
   if (isLoading) return <Skeleton />
   if (error) return <ErrorMessage />
-  
+
   return <StatsDisplay stats={data} />
 }
 ```
@@ -501,7 +501,7 @@ export function useProjects() {
 
 export function useCreateProject() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: async (data: ProjectCreate) => {
       const res = await api.post('/api/v1/projects', data)
@@ -535,24 +535,24 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project, onUpdate }: ProjectCardProps) {
   const [isEditing, setIsEditing] = useState(false)
-  
+
   // Event handlers
   const handleEdit = () => {
     setIsEditing(true)
   }
-  
+
   const handleSave = async () => {
     // Save logic
     setIsEditing(false)
     onUpdate?.(project)
   }
-  
+
   // Render
   return (
     <div className="rounded-lg border p-4">
       <h3 className="text-lg font-semibold">{project.name}</h3>
       <p className="text-neutral-600">{project.description}</p>
-      
+
       <div className="mt-4 flex gap-2">
         {isEditing ? (
           <>
@@ -602,7 +602,7 @@ import { useRouter } from 'next/navigation'
 
 export function LoginForm() {
   const router = useRouter()
-  
+
   const handleLogin = async () => {
     await login(credentials)
     router.push('/dashboard')  // Navigate after login
@@ -622,7 +622,7 @@ interface PageProps {
 export default async function ProjectPage({ params, searchParams }: PageProps) {
   const project = await getProject(params.id)
   const activeTab = searchParams.tab || 'overview'
-  
+
   return <ProjectDetail project={project} activeTab={activeTab} />
 }
 ```
@@ -647,7 +647,7 @@ import { Label } from '@/components/ui/label'
       placeholder="Enter your email"
     />
   </div>
-  
+
   <Button type="submit" className="w-full">
     Sign In
   </Button>
@@ -710,21 +710,21 @@ describe('ProjectCard', () => {
     name: 'Test Project',
     description: 'Test description',
   }
-  
+
   it('renders project name and description', () => {
     render(<ProjectCard project={mockProject} />)
-    
+
     expect(screen.getByText('Test Project')).toBeInTheDocument()
     expect(screen.getByText('Test description')).toBeInTheDocument()
   })
-  
+
   it('calls onUpdate when saved', async () => {
     const onUpdate = vi.fn()
     render(<ProjectCard project={mockProject} onUpdate={onUpdate} />)
-    
+
     fireEvent.click(screen.getByText('Edit'))
     fireEvent.click(screen.getByText('Save'))
-    
+
     expect(onUpdate).toHaveBeenCalledWith(mockProject)
   })
 })
@@ -767,17 +767,17 @@ import Image from 'next/image'
 
 These patterns demonstrate:
 
-✨ **Modern React** - Server Components + Client Components  
-✨ **Type Safety** - Full TypeScript with strict mode  
-✨ **Accessibility** - Radix UI primitives, semantic HTML  
-✨ **Performance** - Code splitting, image optimization  
-✨ **Design System** - Consistent Tailwind patterns  
+✨ **Modern React** - Server Components + Client Components
+✨ **Type Safety** - Full TypeScript with strict mode
+✨ **Accessibility** - Radix UI primitives, semantic HTML
+✨ **Performance** - Code splitting, image optimization
+✨ **Design System** - Consistent Tailwind patterns
 
 **Learn more**: https://github.com/ardhaecosystem/Ardha
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: November 5, 2025  
-**Maintained By**: Ardha Development Team  
+**Version**: 1.0
+**Last Updated**: November 5, 2025
+**Maintained By**: Ardha Development Team
 **License**: MIT (Open Source)

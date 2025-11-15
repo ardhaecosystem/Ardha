@@ -51,7 +51,7 @@ async def create_project(
 ) -> ProjectResponse:
     """
     Create a new project.
-    
+
     - **name**: Project name (required, 1-255 characters)
     - **description**: Optional project description
     - **visibility**: Access level (private/team/public, default: private)
@@ -60,21 +60,21 @@ async def create_project(
     - **git_branch**: Git branch name (default: main)
     - **openspec_enabled**: Enable OpenSpec (default: true)
     - **openspec_path**: OpenSpec directory path (default: openspec/)
-    
+
     Returns the created project with auto-generated slug.
     The creator is automatically added as project owner.
     """
     try:
         service = ProjectService(db)
         project = await service.create_project(project_data, current_user.id)
-        
+
         # Get member count
         member_count = await service.get_member_count(project.id)
-        
+
         # Convert to response model
         response = ProjectResponse.model_validate(project)
         response.member_count = member_count
-        
+
         return response
     except ValueError as e:
         logger.error(f"Validation error creating project: {e}")
@@ -105,12 +105,12 @@ async def list_user_projects(
 ) -> ProjectListResponse:
     """
     List all projects where user is a member.
-    
+
     Query parameters:
     - **skip**: Number of records to skip (pagination, default: 0)
     - **limit**: Maximum number of records (1-100, default: 100)
     - **include_archived**: Include archived projects (default: false)
-    
+
     Returns paginated list of projects with member counts.
     """
     try:
@@ -121,14 +121,14 @@ async def list_user_projects(
             limit=limit,
             include_archived=include_archived,
         )
-        
+
         # Add member counts to each project
         project_responses = []
         for project in projects:
             response = ProjectResponse.model_validate(project)
             response.member_count = await service.get_member_count(project.id)
             project_responses.append(response)
-        
+
         return ProjectListResponse(
             projects=project_responses,
             total=total,
@@ -156,14 +156,14 @@ async def get_project(
 ) -> ProjectResponse:
     """
     Get project by ID.
-    
+
     User must be a member of the project to view it.
-    
+
     Returns full project details including member count.
     """
     try:
         service = ProjectService(db)
-        
+
         # Check if user is a member
         if not await service.check_permission(project_id, current_user.id, "viewer"):
             logger.warning(
@@ -173,13 +173,13 @@ async def get_project(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You are not a member of this project",
             )
-        
+
         project = await service.get_project(project_id)
         member_count = await service.get_member_count(project_id)
-        
+
         response = ProjectResponse.model_validate(project)
         response.member_count = member_count
-        
+
         return response
     except ProjectNotFoundError:
         raise HTTPException(
@@ -209,15 +209,15 @@ async def get_project_by_slug(
 ) -> ProjectResponse:
     """
     Get project by slug.
-    
+
     User must be a member of the project to view it.
-    
+
     Returns full project details including member count.
     """
     try:
         service = ProjectService(db)
         project = await service.get_project_by_slug(slug)
-        
+
         # Check if user is a member
         if not await service.check_permission(project.id, current_user.id, "viewer"):
             logger.warning(
@@ -227,12 +227,12 @@ async def get_project_by_slug(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You are not a member of this project",
             )
-        
+
         member_count = await service.get_member_count(project.id)
-        
+
         response = ProjectResponse.model_validate(project)
         response.member_count = member_count
-        
+
         return response
     except ProjectNotFoundError:
         raise HTTPException(
@@ -263,21 +263,21 @@ async def update_project(
 ) -> ProjectResponse:
     """
     Update project.
-    
+
     Requires owner or admin role.
     Only provided fields will be updated.
-    
+
     Returns updated project with member count.
     """
     try:
         service = ProjectService(db)
         project = await service.update_project(project_id, current_user.id, update_data)
-        
+
         member_count = await service.get_member_count(project_id)
-        
+
         response = ProjectResponse.model_validate(project)
         response.member_count = member_count
-        
+
         return response
     except ProjectNotFoundError:
         raise HTTPException(
@@ -309,16 +309,16 @@ async def archive_project(
 ) -> dict:
     """
     Archive project.
-    
+
     Requires owner or admin role.
     Archived projects are hidden from default queries but can be restored.
-    
+
     Returns success message.
     """
     try:
         service = ProjectService(db)
         await service.archive_project(project_id, current_user.id)
-        
+
         return {"message": "Project archived successfully"}
     except ProjectNotFoundError:
         raise HTTPException(
@@ -350,16 +350,16 @@ async def delete_project(
 ) -> dict:
     """
     Delete project permanently.
-    
+
     Requires owner role only.
     This action cannot be undone. All project data and members will be removed.
-    
+
     Returns success message.
     """
     try:
         service = ProjectService(db)
         await service.delete_project(project_id, current_user.id)
-        
+
         return {"message": "Project deleted successfully"}
     except ProjectNotFoundError:
         raise HTTPException(
@@ -392,14 +392,14 @@ async def get_project_members(
 ) -> list[ProjectMemberResponse]:
     """
     List all project members.
-    
+
     User must be a member to view the member list.
-    
+
     Returns list of members with user information.
     """
     try:
         service = ProjectService(db)
-        
+
         # Check if user is a member
         if not await service.check_permission(project_id, current_user.id, "viewer"):
             logger.warning(
@@ -409,13 +409,14 @@ async def get_project_members(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You are not a member of this project",
             )
-        
+
         members = await service.get_project_members(project_id)
-        
+
         # Load user data separately to avoid lazy loading issues
         from ardha.repositories.user_repository import UserRepository
+
         user_repo = UserRepository(db)
-        
+
         # Populate user data in response
         member_responses = []
         for member in members:
@@ -426,7 +427,7 @@ async def get_project_members(
                 response.user_username = user.username
                 response.user_full_name = user.full_name
             member_responses.append(response)
-        
+
         return member_responses
     except HTTPException:
         raise
@@ -453,13 +454,13 @@ async def add_project_member(
 ) -> ProjectMemberResponse:
     """
     Add member to project.
-    
+
     Requires owner or admin role.
     Cannot add user as 'owner' (owner is assigned at project creation).
-    
+
     - **user_id**: UUID of user to add
     - **role**: Role to assign (admin/member/viewer)
-    
+
     Returns created project member.
     """
     try:
@@ -470,19 +471,20 @@ async def add_project_member(
             member_data.user_id,
             member_data.role,
         )
-        
+
         # Load user data separately to avoid lazy loading issues
         from ardha.repositories.user_repository import UserRepository
+
         user_repo = UserRepository(db)
         user = await user_repo.get_by_id(member_data.user_id)
-        
+
         # Populate response
         response = ProjectMemberResponse.model_validate(member)
         if user:
             response.user_email = user.email
             response.user_username = user.username
             response.user_full_name = user.full_name
-        
+
         return response
     except ProjectNotFoundError:
         raise HTTPException(
@@ -520,16 +522,16 @@ async def remove_project_member(
 ) -> dict:
     """
     Remove member from project.
-    
+
     Requires owner or admin role.
     Cannot remove the project owner.
-    
+
     Returns success message.
     """
     try:
         service = ProjectService(db)
         await service.remove_member(project_id, current_user.id, user_id)
-        
+
         return {"message": "Member removed successfully"}
     except ProjectNotFoundError:
         raise HTTPException(
@@ -572,12 +574,12 @@ async def update_member_role(
 ) -> ProjectMemberResponse:
     """
     Update member's role.
-    
+
     Requires owner or admin role.
     Cannot change to 'owner' role (owner transfer is separate).
-    
+
     - **role**: New role (admin/member/viewer)
-    
+
     Returns updated project member.
     """
     try:
@@ -588,19 +590,20 @@ async def update_member_role(
             user_id,
             role_data.role,
         )
-        
+
         # Load user data separately to avoid lazy loading issues
         from ardha.repositories.user_repository import UserRepository
+
         user_repo = UserRepository(db)
         user = await user_repo.get_by_id(user_id)
-        
+
         # Populate response
         response = ProjectMemberResponse.model_validate(member)
         if user:
             response.user_email = user.email
             response.user_username = user.username
             response.user_full_name = user.full_name
-        
+
         return response
     except ProjectNotFoundError:
         raise HTTPException(

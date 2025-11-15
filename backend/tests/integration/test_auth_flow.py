@@ -28,7 +28,7 @@ async def test_user_registration_and_login(client: AsyncClient) -> None:
     assert register_data["username"] == "newuser"
     assert "password_hash" not in register_data
     assert "id" in register_data
-    
+
     # Login with credentials
     login_response = await client.post(
         "/api/v1/auth/login",
@@ -42,7 +42,7 @@ async def test_user_registration_and_login(client: AsyncClient) -> None:
     assert "access_token" in login_data
     assert "refresh_token" in login_data
     assert login_data["token_type"] == "bearer"
-    
+
     # Verify token works by getting user profile
     me_response = await client.get(
         "/api/v1/auth/me",
@@ -67,7 +67,7 @@ async def test_duplicate_user_registration(client: AsyncClient, test_user: dict)
     )
     assert response.status_code == 400
     assert "already exists" in response.json()["detail"].lower()
-    
+
     # Attempt to register with same username
     response = await client.post(
         "/api/v1/auth/register",
@@ -133,7 +133,7 @@ async def test_token_refresh(client: AsyncClient, test_user: dict) -> None:
     data = response.json()
     assert "access_token" in data
     assert data["token_type"] == "bearer"
-    
+
     # Verify new access token works
     me_response = await client.get(
         "/api/v1/auth/me",
@@ -169,7 +169,7 @@ async def test_update_profile(client: AsyncClient, test_user: dict) -> None:
     data = response.json()
     assert data["full_name"] == "Updated Name"
     assert data["avatar_url"] == "https://example.com/avatar.jpg"
-    
+
     # Verify changes persisted
     me_response = await client.get(
         "/api/v1/auth/me",

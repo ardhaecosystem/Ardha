@@ -29,7 +29,7 @@ async def test_create_and_list_projects(client: AsyncClient, test_user: dict) ->
     assert project1["slug"] == "test-project-alpha"
     assert project1["visibility"] == "private"
     assert "Python" in project1["tech_stack"]
-    
+
     # Create second project
     response = await client.post(
         "/api/v1/projects",
@@ -43,7 +43,7 @@ async def test_create_and_list_projects(client: AsyncClient, test_user: dict) ->
     assert response.status_code == 201
     project2 = response.json()
     assert project2["name"] == "Test Project Beta"
-    
+
     # List all projects
     response = await client.get(
         "/api/v1/projects",
@@ -53,7 +53,7 @@ async def test_create_and_list_projects(client: AsyncClient, test_user: dict) ->
     data = response.json()
     assert data["total"] == 2
     assert len(data["projects"]) == 2
-    
+
     # Verify both projects in list
     project_names = [p["name"] for p in data["projects"]]
     assert "Test Project Alpha" in project_names
@@ -75,7 +75,7 @@ async def test_project_permissions(client: AsyncClient, test_user: dict) -> None
     assert response.status_code == 201
     project = response.json()
     project_id = project["id"]
-    
+
     # Update project (should succeed as owner)
     response = await client.patch(
         f"/api/v1/projects/{project_id}",
@@ -84,7 +84,7 @@ async def test_project_permissions(client: AsyncClient, test_user: dict) -> None
     )
     assert response.status_code == 200
     assert response.json()["description"] == "Updated description by owner"
-    
+
     # Archive project (should succeed as owner)
     response = await client.post(
         f"/api/v1/projects/{project_id}/archive",
@@ -92,7 +92,7 @@ async def test_project_permissions(client: AsyncClient, test_user: dict) -> None
     )
     assert response.status_code == 200
     assert "archived successfully" in response.json()["message"].lower()
-    
+
     # Verify archived project not in default list
     response = await client.get(
         "/api/v1/projects",
@@ -120,7 +120,7 @@ async def test_project_member_management(client: AsyncClient, test_user: dict) -
     assert response.status_code == 201
     member_user = response.json()
     member_id = member_user["id"]
-    
+
     # Create project
     response = await client.post(
         "/api/v1/projects",
@@ -129,7 +129,7 @@ async def test_project_member_management(client: AsyncClient, test_user: dict) -
     )
     assert response.status_code == 201
     project_id = response.json()["id"]
-    
+
     # Add member to project
     response = await client.post(
         f"/api/v1/projects/{project_id}/members",
@@ -140,7 +140,7 @@ async def test_project_member_management(client: AsyncClient, test_user: dict) -
         },
     )
     assert response.status_code == 201
-    
+
     # List project members
     response = await client.get(
         f"/api/v1/projects/{project_id}/members",
@@ -149,12 +149,12 @@ async def test_project_member_management(client: AsyncClient, test_user: dict) -
     assert response.status_code == 200
     members = response.json()
     assert len(members) == 2  # Owner + added member
-    
+
     # Verify member roles
     member_roles = {m["user_id"]: m["role"] for m in members}
     assert member_roles[test_user["user"]["id"]] == "owner"
     assert member_roles[member_id] == "member"
-    
+
     # Update member role
     response = await client.patch(
         f"/api/v1/projects/{project_id}/members/{member_id}",
@@ -163,14 +163,14 @@ async def test_project_member_management(client: AsyncClient, test_user: dict) -
     )
     assert response.status_code == 200
     assert response.json()["role"] == "admin"
-    
+
     # Remove member
     response = await client.delete(
         f"/api/v1/projects/{project_id}/members/{member_id}",
         headers={"Authorization": f"Bearer {test_user['token']}"},
     )
     assert response.status_code == 200
-    
+
     # Verify member removed
     response = await client.get(
         f"/api/v1/projects/{project_id}/members",

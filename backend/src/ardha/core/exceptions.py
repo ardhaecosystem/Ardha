@@ -8,11 +8,11 @@ types of errors that can occur in the application.
 
 class ArdhaException(Exception):
     """Base exception for all Ardha application errors."""
-    
+
     def __init__(self, message: str, details: dict = None):
         """
         Initialize base exception.
-        
+
         Args:
             message: Error message
             details: Optional error details
@@ -24,11 +24,11 @@ class ArdhaException(Exception):
 
 class RepositoryError(ArdhaException):
     """Exception raised for repository-related errors."""
-    
+
     def __init__(self, message: str, operation: str = None, details: dict = None):
         """
         Initialize repository exception.
-        
+
         Args:
             message: Error message
             operation: Optional operation that failed
@@ -40,11 +40,11 @@ class RepositoryError(ArdhaException):
 
 class ServiceError(ArdhaException):
     """Exception raised for service layer errors."""
-    
+
     def __init__(self, message: str, service: str = None, details: dict = None):
         """
         Initialize service exception.
-        
+
         Args:
             message: Error message
             service: Optional service name
@@ -56,11 +56,11 @@ class ServiceError(ArdhaException):
 
 class ValidationError(ArdhaException):
     """Exception raised for validation errors."""
-    
+
     def __init__(self, message: str, field: str = None, value: any = None):
         """
         Initialize validation exception.
-        
+
         Args:
             message: Error message
             field: Optional field that failed validation
@@ -73,21 +73,23 @@ class ValidationError(ArdhaException):
 
 class AuthenticationError(ArdhaException):
     """Exception raised for authentication errors."""
+
     pass
 
 
 class AuthorizationError(ArdhaException):
     """Exception raised for authorization errors."""
+
     pass
 
 
 class NotFoundError(ArdhaException):
     """Exception raised when a resource is not found."""
-    
+
     def __init__(self, message: str, resource_type: str = None, resource_id: str = None):
         """
         Initialize not found exception.
-        
+
         Args:
             message: Error message
             resource_type: Optional type of resource
@@ -100,16 +102,17 @@ class NotFoundError(ArdhaException):
 
 class ConflictError(ArdhaException):
     """Exception raised when a conflict occurs."""
+
     pass
 
 
 class RateLimitError(ArdhaException):
     """Exception raised when rate limit is exceeded."""
-    
+
     def __init__(self, message: str, limit: int = None, window: int = None):
         """
         Initialize rate limit exception.
-        
+
         Args:
             message: Error message
             limit: Optional rate limit
@@ -122,11 +125,11 @@ class RateLimitError(ArdhaException):
 
 class ExternalServiceError(ArdhaException):
     """Exception raised for external service errors."""
-    
+
     def __init__(self, message: str, service: str = None, status_code: int = None):
         """
         Initialize external service exception.
-        
+
         Args:
             message: Error message
             service: Optional external service name

@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class WorkflowResponse(BaseModel):
     """Response schema for workflow details."""
-    
+
     id: UUID = Field(..., description="Workflow ID")
     name: str = Field(..., description="Workflow name")
     description: Optional[str] = Field(None, description="Workflow description")
@@ -24,13 +24,13 @@ class WorkflowResponse(BaseModel):
     project_id: Optional[UUID] = Field(None, description="Associated project ID")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class WorkflowExecutionResponse(BaseModel):
     """Response schema for workflow execution details."""
-    
+
     id: UUID = Field(..., description="Execution ID")
     workflow_id: UUID = Field(..., description="Workflow ID")
     user_id: UUID = Field(..., description="User ID who executed")
@@ -54,13 +54,13 @@ class WorkflowExecutionResponse(BaseModel):
     started_at: Optional[str] = Field(None, description="Start timestamp")
     completed_at: Optional[str] = Field(None, description="Completion timestamp")
     last_activity: Optional[str] = Field(None, description="Last activity timestamp")
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class WorkflowStatusResponse(BaseModel):
     """Response schema for workflow execution status."""
-    
+
     execution_id: UUID = Field(..., description="Execution ID")
     workflow_id: UUID = Field(..., description="Workflow ID")
     status: str = Field(..., description="Current status")
@@ -74,24 +74,24 @@ class WorkflowStatusResponse(BaseModel):
     total_cost: float = Field(..., description="Total cost incurred")
     token_usage: Dict[str, int] = Field(..., description="Token usage statistics")
     last_activity: Optional[str] = Field(None, description="Last activity timestamp")
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class WorkflowListResponse(BaseModel):
     """Response schema for paginated workflow execution list."""
-    
+
     executions: List[WorkflowExecutionResponse] = Field(..., description="List of executions")
     total: int = Field(..., description="Total number of executions")
     limit: int = Field(..., description="Page limit")
     offset: int = Field(..., description="Page offset")
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class WorkflowNodeResponse(BaseModel):
     """Response schema for workflow node information."""
-    
+
     name: str = Field(..., description="Node name")
     type: str = Field(..., description="Node type")
     description: str = Field(..., description="Node description")
@@ -106,30 +106,32 @@ class WorkflowNodeResponse(BaseModel):
     ai_calls_made: int = Field(0, description="Number of AI calls made")
     tokens_used: int = Field(0, description="Tokens used by this node")
     cost_incurred: float = Field(0.0, description="Cost incurred by this node")
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class WorkflowStatsResponse(BaseModel):
     """Response schema for workflow statistics."""
-    
+
     total_executions: int = Field(..., description="Total executions")
     successful_executions: int = Field(..., description="Successful executions")
     failed_executions: int = Field(..., description="Failed executions")
-    average_duration: Optional[float] = Field(None, description="Average execution duration (seconds)")
+    average_duration: Optional[float] = Field(
+        None, description="Average execution duration (seconds)"
+    )
     total_cost: float = Field(..., description="Total cost incurred")
     total_tokens: int = Field(..., description="Total tokens used")
     most_used_workflow_type: str = Field(..., description="Most used workflow type")
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class WorkflowCancelResponse(BaseModel):
     """Response schema for workflow cancellation."""
-    
+
     message: str = Field(..., description="Cancellation message")
     execution_id: UUID = Field(..., description="Cancelled execution ID")
     reason: Optional[str] = Field(None, description="Cancellation reason")
     cancelled_at: str = Field(..., description="Cancellation timestamp")
-    
+
     model_config = ConfigDict(from_attributes=True)

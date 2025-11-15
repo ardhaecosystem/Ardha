@@ -16,11 +16,11 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-# Import Base for model discovery
-from ardha.db.base import Base
-
 # Import settings for database URL
 from ardha.core.config import settings
+
+# Import Base for model discovery
+from ardha.db.base import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -71,7 +71,7 @@ def run_migrations_offline() -> None:
 def do_run_migrations(connection: Connection) -> None:
     """
     Run migrations with the provided connection.
-    
+
     Args:
         connection: SQLAlchemy connection to use for migrations
     """
@@ -84,7 +84,7 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     """
     Run migrations in async mode.
-    
+
     Creates an async engine and runs migrations within
     an async context.
     """

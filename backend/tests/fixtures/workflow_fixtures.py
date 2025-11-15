@@ -13,9 +13,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ardha.models.workflow_execution import WorkflowExecution
-from ardha.schemas.workflows.research import (
-    ResearchState,
-)
+from ardha.schemas.workflows.research import ResearchState
 from ardha.workflows.state import WorkflowContext, WorkflowStatus, WorkflowType
 
 # =============================================================================

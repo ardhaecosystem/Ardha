@@ -31,11 +31,11 @@ if TYPE_CHECKING:
 class Milestone(BaseModel, Base):
     """
     Milestone model representing a major goal or release within a project.
-    
+
     Milestones help organize tasks into phases or releases, providing a roadmap
     view of project progress. They support flexible date tracking, progress
     calculation, and drag-drop ordering.
-    
+
     Attributes:
         project_id: Foreign key to the project
         name: Milestone display name (e.g., "Phase 1: Backend", "MVP Release")
@@ -50,102 +50,92 @@ class Milestone(BaseModel, Base):
         project: Relationship to parent Project
         tasks: Relationship to linked Task objects
     """
-    
+
     __tablename__ = "milestones"
-    
+
     # ============= Identity & Organization =============
-    
+
     project_id: Mapped[UUID] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Foreign key to owning project"
+        comment="Foreign key to owning project",
     )
-    
-    name: Mapped[str] = mapped_column(
-        String(255),
-        nullable=False,
-        comment="Milestone display name"
-    )
-    
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False, comment="Milestone display name")
+
     description: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-        comment="Optional detailed description"
+        Text, nullable=True, comment="Optional detailed description"
     )
-    
+
     # ============= Status & Progress =============
-    
+
     status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
         default="not_started",
         index=True,
-        comment="Status: not_started, in_progress, completed, cancelled"
+        comment="Status: not_started, in_progress, completed, cancelled",
     )
-    
+
     color: Mapped[str] = mapped_column(
         String(7),
         nullable=False,
         default="#3b82f6",
-        comment="Hex color code for UI display (e.g., #3b82f6)"
+        comment="Hex color code for UI display (e.g., #3b82f6)",
     )
-    
+
     progress_percentage: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         default=0,
-        comment="Progress 0-100, calculated from task completion"
+        comment="Progress 0-100, calculated from task completion",
     )
-    
+
     # ============= Dates =============
-    
+
     start_date: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        comment="Optional start date"
+        DateTime(timezone=True), nullable=True, comment="Optional start date"
     )
-    
+
     due_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
         index=True,
-        comment="Optional target completion date"
+        comment="Optional target completion date",
     )
-    
+
     completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        comment="Timestamp when status changed to completed"
+        DateTime(timezone=True), nullable=True, comment="Timestamp when status changed to completed"
     )
-    
+
     # ============= Ordering =============
-    
+
     order: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
-        comment="Display order for drag-drop sorting (auto-assigned on creation)"
+        comment="Display order for drag-drop sorting (auto-assigned on creation)",
     )
-    
+
     # created_at and updated_at inherited from BaseModel
-    
+
     # ============= Relationships =============
-    
+
     # Many-to-one: Project relationship
     project: Mapped["Project"] = relationship(
         "Project",
         back_populates="milestones",
     )
-    
+
     # One-to-many: Tasks relationship
     tasks: Mapped[list["Task"]] = relationship(
         "Task",
         back_populates="milestone",
         foreign_keys="Task.milestone_id",
     )
-    
+
     # ============= Constraints & Indexes =============
-    
+
     __table_args__ = (
         # Index for ordering queries (no unique constraint to allow flexibility)
         Index("ix_milestone_project_order", "project_id", "order"),
@@ -154,60 +144,53 @@ class Milestone(BaseModel, Base):
         # Check constraints for data validation
         CheckConstraint(
             "status IN ('not_started', 'in_progress', 'completed', 'cancelled')",
-            name="ck_milestone_status"
+            name="ck_milestone_status",
         ),
         CheckConstraint(
-            "progress_percentage >= 0 AND progress_percentage <= 100",
-            name="ck_milestone_progress"
+            "progress_percentage >= 0 AND progress_percentage <= 100", name="ck_milestone_progress"
         ),
-        CheckConstraint(
-            "color ~ '^#[0-9A-Fa-f]{6}$'",
-            name="ck_milestone_color"
-        ),
-        CheckConstraint(
-            "\"order\" >= 0",
-            name="ck_milestone_order"
-        ),
+        CheckConstraint("color ~ '^#[0-9A-Fa-f]{6}$'", name="ck_milestone_color"),
+        CheckConstraint('"order" >= 0', name="ck_milestone_order"),
     )
-    
+
     # ============= Computed Properties =============
-    
+
     @property
     def is_overdue(self) -> bool:
         """
         Check if milestone is overdue.
-        
+
         Returns False if:
         - Status is completed or cancelled
         - No due date set
-        
+
         Returns:
             True if milestone is past due date, False otherwise
         """
-        if self.status in ['completed', 'cancelled']:
+        if self.status in ["completed", "cancelled"]:
             return False
         if not self.due_date:
             return False
         return datetime.now(timezone.utc) > self.due_date
-    
+
     @property
     def days_remaining(self) -> int | None:
         """
         Calculate days until due date.
-        
+
         Returns None if:
         - Status is completed or cancelled
         - No due date set
-        
+
         Returns:
             Number of days remaining (0 if overdue), or None
         """
-        if not self.due_date or self.status in ['completed', 'cancelled']:
+        if not self.due_date or self.status in ["completed", "cancelled"]:
             return None
-        
+
         delta = self.due_date - datetime.now(timezone.utc)
         return max(0, delta.days)
-    
+
     def __repr__(self) -> str:
         """String representation of Milestone."""
         return (
