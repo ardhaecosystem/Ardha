@@ -24,6 +24,7 @@ from tests.fixtures.git_fixtures import (
     git_service_with_commits,
     git_service_with_files,
     git_service_with_remote,
+    temp_dir,
     temp_git_repo,
 )
 
