@@ -7,6 +7,8 @@ This package contains all SQLAlchemy ORM models for the Ardha application.
 from ardha.models.ai_usage import AIUsage
 from ardha.models.base import Base, BaseModel, SoftDeleteMixin
 from ardha.models.chat import Chat
+from ardha.models.file import File
+from ardha.models.git_commit import GitCommit
 from ardha.models.message import Message
 from ardha.models.milestone import Milestone
 from ardha.models.openspec import OpenSpecProposal
@@ -36,4 +38,6 @@ __all__ = [
     "AIUsage",
     "WorkflowExecution",
     "OpenSpecProposal",
+    "File",
+    "GitCommit",
 ]

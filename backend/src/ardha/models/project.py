@@ -17,6 +17,8 @@ from ardha.models.base import Base, BaseModel
 if TYPE_CHECKING:
     from ardha.models.ai_usage import AIUsage
     from ardha.models.chat import Chat
+    from ardha.models.file import File
+    from ardha.models.git_commit import GitCommit
     from ardha.models.memory import Memory
     from ardha.models.milestone import Milestone
     from ardha.models.openspec import OpenSpecProposal
@@ -147,6 +149,20 @@ class Project(BaseModel, Base):
 
     openspec_proposals: Mapped[list["OpenSpecProposal"]] = relationship(
         "OpenSpecProposal",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    files: Mapped[list["File"]] = relationship(
+        "File",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    git_commits: Mapped[list["GitCommit"]] = relationship(
+        "GitCommit",
         back_populates="project",
         cascade="all, delete-orphan",
         lazy="select",

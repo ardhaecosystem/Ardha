@@ -19,6 +19,8 @@ from ardha.models.base import Base, BaseModel
 if TYPE_CHECKING:
     from ardha.models.ai_usage import AIUsage
     from ardha.models.chat import Chat
+    from ardha.models.file import File
+    from ardha.models.git_commit import GitCommit
     from ardha.models.memory import Memory
     from ardha.models.openspec import OpenSpecProposal
     from ardha.models.project import Project
@@ -139,6 +141,20 @@ class User(Base, BaseModel):
         "OpenSpecProposal",
         foreign_keys="OpenSpecProposal.approved_by_user_id",
         back_populates="approved_by",
+        lazy="select",
+    )
+
+    modified_files: Mapped[list["File"]] = relationship(
+        "File",
+        foreign_keys="File.last_modified_by_user_id",
+        back_populates="last_modified_by",
+        lazy="select",
+    )
+
+    git_commits: Mapped[list["GitCommit"]] = relationship(
+        "GitCommit",
+        foreign_keys="GitCommit.ardha_user_id",
+        back_populates="ardha_user",
         lazy="select",
     )
 

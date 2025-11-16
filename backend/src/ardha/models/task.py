@@ -34,6 +34,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ardha.models.base import Base, BaseModel
 
 if TYPE_CHECKING:
+    from ardha.models.git_commit import GitCommit
     from ardha.models.milestone import Milestone
     from ardha.models.openspec import OpenSpecProposal
     from ardha.models.project import Project
@@ -209,12 +210,12 @@ class Task(Base, BaseModel):
 
     # ============= Related Items (JSON Arrays) =============
 
-    related_commits: Mapped[list[str]] = mapped_column(
+    related_commit_shas: Mapped[list[str]] = mapped_column(
         ARRAY(String),
         nullable=False,
         default=list,
         server_default="{}",
-        comment="Array of git commit SHAs",
+        comment="Array of git commit SHAs (legacy, use related_commits relationship)",
     )
 
     related_prs: Mapped[list[str]] = mapped_column(
@@ -320,6 +321,13 @@ class Task(Base, BaseModel):
         foreign_keys=[openspec_proposal_id],
     )
 
+    # Many-to-many: Git commits relationship
+    related_commits: Mapped[list["GitCommit"]] = relationship(
+        "GitCommit",
+        secondary="task_commits",
+        back_populates="linked_tasks",
+    )
+
     # ============= Constraints =============
 
     __table_args__ = (
@@ -350,7 +358,8 @@ class Task(Base, BaseModel):
             name="ck_task_actual_hours",
         ),
         CheckConstraint(
-            "ai_confidence IS NULL OR (ai_confidence >= 0 AND ai_confidence <= 1)",
+            "ai_confidence IS NULL OR (ai_confidence >= 0 AND "
+            "ai_confidence <= 1)",
             name="ck_task_ai_confidence",
         ),
     )
