@@ -21,23 +21,8 @@ from ardha.models.base import Base
 TEST_DATABASE_URL = "postgresql+asyncpg://ardha_user:ardha_password@localhost:5432/ardha_test"
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """
-    Create event loop for async tests.
-
-    This fixture ensures all async tests share the same event loop
-    for the entire test session, preventing event loop conflicts.
-    """
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
-# Fix pytest-asyncio deprecation warning
-@pytest.fixture(scope="session")
-def anyio_backend():
-    return "asyncio"
+# Fix pytest-asyncio deprecation warning by removing custom event_loop fixture
+# pytest-asyncio will handle event loop creation automatically
 
 
 @pytest_asyncio.fixture(scope="function")
