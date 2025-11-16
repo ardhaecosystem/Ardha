@@ -20,6 +20,8 @@ from ardha.services.git_service import GitService
 
 # Import git fixtures
 from tests.fixtures.git_fixtures import (
+    empty_git_service,
+    git_service,
     git_service_with_branches,
     git_service_with_commits,
     git_service_with_files,
