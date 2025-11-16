@@ -75,6 +75,12 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+filterwarnings = [
+    "ignore::DeprecationWarning:passlib.*:",
+    "ignore::DeprecationWarning:pydantic.*:",
+    "ignore::DeprecationWarning:jose.*:",
+    "ignore::UserWarning:passlib.*:",
+]
 
 [tool.bandit]
 exclude_dirs = ["tests", "alembic"]

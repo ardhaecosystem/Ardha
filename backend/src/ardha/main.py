@@ -9,6 +9,8 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from ardha.api.v1.routes import (
     auth,
     chats,
+    files,
+    git,
     memories,
     milestones,
     oauth,
@@ -49,6 +51,8 @@ def create_app() -> FastAPI:
     app.include_router(projects.router, prefix="/api/v1")
     app.include_router(milestones.router, prefix="/api/v1/milestones")
     app.include_router(tasks.router, prefix="/api/v1")
+    app.include_router(files.router, prefix="/api/v1")
+    app.include_router(git.router, prefix="/api/v1")
     app.include_router(chats.router, prefix="/api/v1")
     app.include_router(memories.router, prefix="/api/v1")
     app.include_router(openspec.router, prefix="/api/v1")
