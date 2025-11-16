@@ -5,10 +5,10 @@ This module tests all FileRepository methods to ensure proper
 database operations, error handling, and data integrity.
 """
 
-import pytest
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -81,13 +81,18 @@ async def sample_files_batch(test_project: Project) -> list[File]:
     """Create batch of sample files for testing."""
     files = []
     file_data = [
-        ("src/utils.py", "code", "python", "# Utility functions\nThis file contains utility functions."),
+        (
+            "src/utils.py",
+            "code",
+            "python",
+            "# Utility functions\nThis file contains utility functions.",
+        ),
         ("README.md", "doc", "markdown", "# Project README\nThis is the project README."),
         ("config.json", "config", "json", '{"debug": true}'),
         ("test_main.py", "test", "python", "# Test file\nThis is a test file."),
         ("assets/logo.png", "asset", None, None),  # Binary file
     ]
-    
+
     for path, file_type, language, content in file_data:
         file_obj = File(
             id=uuid4(),
@@ -104,7 +109,7 @@ async def sample_files_batch(test_project: Project) -> list[File]:
             is_binary=content is None,
         )
         files.append(file_obj)
-    
+
     return files
 
 
@@ -115,7 +120,7 @@ class TestFileRepository:
     async def test_create_file(self, file_repo: FileRepository, sample_file: File):
         """Test creating a new file."""
         created_file = await file_repo.create(sample_file)
-        
+
         assert created_file.id == sample_file.id
         assert created_file.path == sample_file.path
         assert created_file.project_id == sample_file.project_id
@@ -129,7 +134,7 @@ class TestFileRepository:
         """Test creating file with duplicate path raises IntegrityError."""
         # Create first file
         await file_repo.create(sample_file)
-        
+
         # Try to create duplicate
         duplicate_file = File(
             id=uuid4(),
@@ -138,7 +143,7 @@ class TestFileRepository:
             name="duplicate.py",
             file_type="code",
         )
-        
+
         with pytest.raises(IntegrityError):
             await file_repo.create(duplicate_file)
 
@@ -147,10 +152,10 @@ class TestFileRepository:
         """Test fetching file by ID."""
         # Create file first
         created_file = await file_repo.create(sample_file)
-        
+
         # Fetch by ID
         fetched_file = await file_repo.get_by_id(created_file.id)
-        
+
         assert fetched_file is not None
         assert fetched_file.id == created_file.id
         assert fetched_file.path == created_file.path
@@ -160,7 +165,7 @@ class TestFileRepository:
         """Test fetching non-existent file by ID."""
         non_existent_id = uuid4()
         fetched_file = await file_repo.get_by_id(non_existent_id)
-        
+
         assert fetched_file is None
 
     @pytest.mark.asyncio
@@ -168,12 +173,10 @@ class TestFileRepository:
         """Test fetching file by project_id and path."""
         # Create file first
         created_file = await file_repo.create(sample_file)
-        
+
         # Fetch by path
-        fetched_file = await file_repo.get_by_path(
-            created_file.project_id, created_file.path
-        )
-        
+        fetched_file = await file_repo.get_by_path(created_file.project_id, created_file.path)
+
         assert fetched_file is not None
         assert fetched_file.id == created_file.id
         assert fetched_file.path == created_file.path
@@ -182,21 +185,19 @@ class TestFileRepository:
     async def test_get_by_path_not_found(self, file_repo: FileRepository, test_project: Project):
         """Test fetching non-existent file by path."""
         fetched_file = await file_repo.get_by_path(test_project.id, "nonexistent.py")
-        
+
         assert fetched_file is None
 
     @pytest.mark.asyncio
-    async def test_list_by_project(
-        self, file_repo: FileRepository, sample_files_batch: list[File]
-    ):
+    async def test_list_by_project(self, file_repo: FileRepository, sample_files_batch: list[File]):
         """Test listing files by project."""
         # Create files
         for file_obj in sample_files_batch:
             await file_repo.create(file_obj)
-        
+
         # List all files
         files = await file_repo.list_by_project(sample_files_batch[0].project_id)
-        
+
         assert len(files) == len(sample_files_batch)
         assert all(f.project_id == sample_files_batch[0].project_id for f in files)
 
@@ -208,19 +209,15 @@ class TestFileRepository:
         # Create files
         for file_obj in sample_files_batch:
             await file_repo.create(file_obj)
-        
+
         project_id = sample_files_batch[0].project_id
-        
+
         # Filter by file type
-        code_files = await file_repo.list_by_project(
-            project_id, file_type=FileType.CODE
-        )
+        code_files = await file_repo.list_by_project(project_id, file_type=FileType.CODE)
         assert len(code_files) == 1  # src/utils.py (only one with file_type="code")
-        
+
         # Filter by language
-        python_files = await file_repo.list_by_project(
-            project_id, language="python"
-        )
+        python_files = await file_repo.list_by_project(project_id, language="python")
         assert len(python_files) == 2  # src/utils.py, test_main.py
 
     @pytest.mark.asyncio
@@ -231,33 +228,31 @@ class TestFileRepository:
         # Create files
         for file_obj in sample_files_batch:
             await file_repo.create(file_obj)
-        
+
         project_id = sample_files_batch[0].project_id
-        
+
         # List files in src directory
         src_files = await file_repo.list_by_directory(project_id, "src")
         assert len(src_files) == 1  # src/utils.py (only one in test data)
-        
+
         # List files recursively
         all_files = await file_repo.list_by_directory(project_id, "src", recursive=True)
         assert len(all_files) == 1  # Same files, no subdirectories in test data
 
     @pytest.mark.asyncio
-    async def test_search_files(
-        self, file_repo: FileRepository, sample_files_batch: list[File]
-    ):
+    async def test_search_files(self, file_repo: FileRepository, sample_files_batch: list[File]):
         """Test searching files by name."""
         # Create files
         for file_obj in sample_files_batch:
             await file_repo.create(file_obj)
-        
+
         project_id = sample_files_batch[0].project_id
-        
+
         # Search by name
         results = await file_repo.search_files(project_id, "main")
         assert len(results) == 1
         assert "main" in results[0].name
-        
+
         # Search by path
         results = await file_repo.search_files(project_id, "src")
         assert len(results) == 1  # src/utils.py (only one in test data)
@@ -270,9 +265,9 @@ class TestFileRepository:
         # Create files
         for file_obj in sample_files_batch:
             await file_repo.create(file_obj)
-        
+
         project_id = sample_files_batch[0].project_id
-        
+
         # Search including content
         results = await file_repo.search_files(project_id, "Utility", search_content=True)
         assert len(results) == 1  # src/utils.py contains "Utility"
@@ -282,7 +277,7 @@ class TestFileRepository:
         """Test updating file fields."""
         # Create file first
         created_file = await file_repo.create(sample_file)
-        
+
         # Update file
         update_data = {
             "name": "updated_main.py",
@@ -290,7 +285,7 @@ class TestFileRepository:
             "language": "python",
         }
         updated_file = await file_repo.update(created_file.id, update_data)
-        
+
         assert updated_file is not None
         assert updated_file.name == "updated_main.py"
         assert updated_file.file_type == "test"
@@ -301,7 +296,7 @@ class TestFileRepository:
         """Test updating non-existent file."""
         non_existent_id = uuid4()
         update_data = {"name": "updated.py"}
-        
+
         updated_file = await file_repo.update(non_existent_id, update_data)
         assert updated_file is None
 
@@ -310,11 +305,11 @@ class TestFileRepository:
         """Test updating file content."""
         # Create file first
         created_file = await file_repo.create(sample_file)
-        
+
         # Update content
         new_content = "print('Updated content!')"
         updated_file = await file_repo.update_content(created_file.id, new_content)
-        
+
         assert updated_file is not None
         assert updated_file.content == new_content
         assert updated_file.content_hash == File.calculate_content_hash(new_content)
@@ -327,16 +322,16 @@ class TestFileRepository:
         """Test updating file git metadata."""
         # Create file first
         created_file = await file_repo.create(sample_file)
-        
+
         # Update git metadata
         commit_sha = "abc123def456789012345678901234567890abcd"
         commit_message = "Update main.py"
         modified_at = datetime.now(timezone.utc)
-        
+
         updated_file = await file_repo.update_from_git(
             created_file.id, commit_sha, commit_message, test_user.id, modified_at
         )
-        
+
         assert updated_file is not None
         assert updated_file.last_commit_sha == commit_sha
         assert updated_file.last_commit_message == commit_message
@@ -348,11 +343,11 @@ class TestFileRepository:
         """Test soft deleting a file."""
         # Create file first
         created_file = await file_repo.create(sample_file)
-        
+
         # Soft delete
         deleted = await file_repo.delete(created_file.id, soft=True)
         assert deleted is True
-        
+
         # Verify file is soft deleted
         deleted_file = await file_repo.get_by_id(created_file.id)
         assert deleted_file is not None
@@ -364,11 +359,11 @@ class TestFileRepository:
         """Test hard deleting a file."""
         # Create file first
         created_file = await file_repo.create(sample_file)
-        
+
         # Hard delete
         deleted = await file_repo.delete(created_file.id, soft=False)
         assert deleted is True
-        
+
         # Verify file is completely deleted
         deleted_file = await file_repo.get_by_id(created_file.id)
         assert deleted_file is None
@@ -379,10 +374,10 @@ class TestFileRepository:
         # Create and soft delete file
         created_file = await file_repo.create(sample_file)
         await file_repo.delete(created_file.id, soft=True)
-        
+
         # Restore file
         restored_file = await file_repo.restore(created_file.id)
-        
+
         assert restored_file is not None
         assert restored_file.is_deleted is False
         assert restored_file.deleted_at is None
@@ -393,15 +388,15 @@ class TestFileRepository:
     ):
         """Test counting files by project."""
         project_id = sample_files_batch[0].project_id
-        
+
         # Count before creating
         count_before = await file_repo.count_by_project(project_id)
         assert count_before == 0
-        
+
         # Create files
         for file_obj in sample_files_batch:
             await file_repo.create(file_obj)
-        
+
         # Count after creating
         count_after = await file_repo.count_by_project(project_id)
         assert count_after == len(sample_files_batch)
@@ -411,26 +406,24 @@ class TestFileRepository:
         """Test getting file with commit history."""
         # Create file first
         created_file = await file_repo.create(sample_file)
-        
+
         # Get file with commits (should be empty for now)
         result = await file_repo.get_file_with_commits(created_file.id)
-        
+
         assert result is not None
         file, commits = result
         assert file.id == created_file.id
         assert len(commits) == 0  # No commits linked yet
 
     @pytest.mark.asyncio
-    async def test_bulk_create(
-        self, file_repo: FileRepository, sample_files_batch: list[File]
-    ):
+    async def test_bulk_create(self, file_repo: FileRepository, sample_files_batch: list[File]):
         """Test bulk creating files."""
         # Bulk create files
         created_files = await file_repo.bulk_create(sample_files_batch)
-        
+
         assert len(created_files) == len(sample_files_batch)
         assert all(f.id is not None for f in created_files)
-        
+
         # Verify all files were created
         project_id = sample_files_batch[0].project_id
         count = await file_repo.count_by_project(project_id)
@@ -443,19 +436,19 @@ class TestFileRepository:
         """Test getting files modified since a specific date."""
         # Create file first
         created_file = await file_repo.create(sample_file)
-        
+
         # Update with git metadata to set last_modified_at
         commit_time = datetime.now(timezone.utc)
         await file_repo.update_from_git(
             created_file.id, "abc123", "Test commit", test_user.id, commit_time
         )
-        
+
         # Get files modified since earlier time
         earlier_time = commit_time.replace(second=0, microsecond=0) - timedelta(minutes=1)
         modified_files = await file_repo.get_files_modified_since(
             created_file.project_id, earlier_time
         )
-        
+
         assert len(modified_files) == 1
         assert modified_files[0].id == created_file.id
 
@@ -467,16 +460,16 @@ class TestFileRepository:
         # Create files
         for file_obj in sample_files_batch:
             await file_repo.create(file_obj)
-        
+
         project_id = sample_files_batch[0].project_id
-        
+
         # Test pagination
         first_page = await file_repo.list_by_project(project_id, skip=0, limit=2)
         second_page = await file_repo.list_by_project(project_id, skip=2, limit=2)
-        
+
         assert len(first_page) == 2
         assert len(second_page) == 2
-        
+
         # Ensure no overlap
         first_page_ids = {f.id for f in first_page}
         second_page_ids = {f.id for f in second_page}
@@ -490,11 +483,11 @@ class TestFileRepository:
         # Create file first
         created_file = await file_repo.create(sample_file)
         original_hash = created_file.content_hash
-        
+
         # Update content
         new_content = "print('Completely different content!')"
         updated_file = await file_repo.update_content(created_file.id, new_content)
-        
+
         assert updated_file is not None
         assert updated_file.content_hash != original_hash
         assert updated_file.content_hash == File.calculate_content_hash(new_content)
@@ -507,12 +500,12 @@ class TestFileRepository:
         # Create files
         for file_obj in sample_files_batch:
             await file_repo.create(file_obj)
-        
+
         project_id = sample_files_batch[0].project_id
-        
+
         # Search with different case
         results_lower = await file_repo.search_files(project_id, "main")
         results_upper = await file_repo.search_files(project_id, "MAIN")
-        
+
         assert len(results_lower) == len(results_upper) == 1
         assert results_lower[0].id == results_upper[0].id

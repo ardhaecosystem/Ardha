@@ -5,18 +5,18 @@ This module tests all GitCommitRepository methods to ensure proper
 database operations, error handling, and relationship management.
 """
 
-import pytest
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ardha.models.file import File
 from ardha.models.git_commit import GitCommit
 from ardha.models.project import Project
-from ardha.models.user import User
-from ardha.models.file import File
 from ardha.models.task import Task
+from ardha.models.user import User
 from ardha.repositories.git_commit import GitCommitRepository
 from ardha.schemas.file import ChangeType
 
@@ -119,7 +119,7 @@ async def sample_commits_batch(test_project: Project, test_user: User) -> list[G
     """Create batch of sample commits for testing."""
     commits = []
     base_time = datetime.now(timezone.utc)
-    
+
     for i in range(5):
         commit = GitCommit(
             id=uuid4(),
@@ -134,7 +134,7 @@ async def sample_commits_batch(test_project: Project, test_user: User) -> list[G
             ardha_user_id=test_user.id,
         )
         commits.append(commit)
-    
+
     return commits
 
 
@@ -145,7 +145,7 @@ class TestGitCommitRepository:
     async def test_create_commit(self, commit_repo: GitCommitRepository, sample_commit: GitCommit):
         """Test creating a new git commit."""
         created_commit = await commit_repo.create(sample_commit)
-        
+
         assert created_commit.id == sample_commit.id
         assert created_commit.sha == sample_commit.sha
         assert created_commit.project_id == sample_commit.project_id
@@ -159,7 +159,7 @@ class TestGitCommitRepository:
         """Test creating commit with duplicate SHA raises IntegrityError."""
         # Create first commit
         await commit_repo.create(sample_commit)
-        
+
         # Try to create duplicate
         duplicate_commit = GitCommit(
             id=uuid4(),
@@ -172,7 +172,7 @@ class TestGitCommitRepository:
             committed_at=datetime.now(timezone.utc),
             message="Duplicate commit",
         )
-        
+
         with pytest.raises(IntegrityError):
             await commit_repo.create(duplicate_commit)
 
@@ -181,10 +181,10 @@ class TestGitCommitRepository:
         """Test fetching commit by ID."""
         # Create commit first
         created_commit = await commit_repo.create(sample_commit)
-        
+
         # Fetch by ID
         fetched_commit = await commit_repo.get_by_id(created_commit.id)
-        
+
         assert fetched_commit is not None
         assert fetched_commit.id == created_commit.id
         assert fetched_commit.sha == created_commit.sha
@@ -194,44 +194,48 @@ class TestGitCommitRepository:
         """Test fetching non-existent commit by ID."""
         non_existent_id = uuid4()
         fetched_commit = await commit_repo.get_by_id(non_existent_id)
-        
+
         assert fetched_commit is None
 
     @pytest.mark.asyncio
-    async def test_get_by_sha_full(self, commit_repo: GitCommitRepository, sample_commit: GitCommit):
+    async def test_get_by_sha_full(
+        self, commit_repo: GitCommitRepository, sample_commit: GitCommit
+    ):
         """Test fetching commit by full SHA."""
         # Create commit first
         created_commit = await commit_repo.create(sample_commit)
-        
+
         # Fetch by full SHA
-        fetched_commit = await commit_repo.get_by_sha(
-            created_commit.project_id, created_commit.sha
-        )
-        
+        fetched_commit = await commit_repo.get_by_sha(created_commit.project_id, created_commit.sha)
+
         assert fetched_commit is not None
         assert fetched_commit.id == created_commit.id
         assert fetched_commit.sha == created_commit.sha
 
     @pytest.mark.asyncio
-    async def test_get_by_sha_short(self, commit_repo: GitCommitRepository, sample_commit: GitCommit):
+    async def test_get_by_sha_short(
+        self, commit_repo: GitCommitRepository, sample_commit: GitCommit
+    ):
         """Test fetching commit by short SHA."""
         # Create commit first
         created_commit = await commit_repo.create(sample_commit)
-        
+
         # Fetch by short SHA
         fetched_commit = await commit_repo.get_by_sha(
             created_commit.project_id, created_commit.short_sha
         )
-        
+
         assert fetched_commit is not None
         assert fetched_commit.id == created_commit.id
         assert fetched_commit.short_sha == created_commit.short_sha
 
     @pytest.mark.asyncio
-    async def test_get_by_sha_not_found(self, commit_repo: GitCommitRepository, test_project: Project):
+    async def test_get_by_sha_not_found(
+        self, commit_repo: GitCommitRepository, test_project: Project
+    ):
         """Test fetching non-existent commit by SHA."""
         fetched_commit = await commit_repo.get_by_sha(test_project.id, "nonexistent")
-        
+
         assert fetched_commit is None
 
     @pytest.mark.asyncio
@@ -242,12 +246,12 @@ class TestGitCommitRepository:
         # Create commits
         for commit in sample_commits_batch:
             await commit_repo.create(commit)
-        
+
         project_id = sample_commits_batch[0].project_id
-        
+
         # List all commits
         commits = await commit_repo.list_by_project(project_id)
-        
+
         assert len(commits) == len(sample_commits_batch)
         assert all(c.project_id == project_id for c in commits)
         # Should be ordered by committed_at DESC
@@ -262,13 +266,13 @@ class TestGitCommitRepository:
         # Create commits
         for commit in sample_commits_batch:
             await commit_repo.create(commit)
-        
+
         project_id = sample_commits_batch[0].project_id
-        
+
         # Filter by branch
         main_commits = await commit_repo.list_by_project(project_id, branch="main")
         assert len(main_commits) == len(sample_commits_batch)
-        
+
         # Filter by author
         author_commits = await commit_repo.list_by_project(
             project_id, author_email="author@example.com"
@@ -277,51 +281,67 @@ class TestGitCommitRepository:
 
     @pytest.mark.asyncio
     async def test_list_by_file(
-        self, commit_repo: GitCommitRepository, sample_commit: GitCommit, test_file: File, test_db: AsyncSession
+        self,
+        commit_repo: GitCommitRepository,
+        sample_commit: GitCommit,
+        test_file: File,
+        test_db: AsyncSession,
     ):
         """Test listing commits that changed a specific file."""
         # Create commit and link to file
         await commit_repo.create(sample_commit)
-        await commit_repo.link_to_files(sample_commit.id, [{
-            "file_id": test_file.id,
-            "change_type": ChangeType.MODIFIED,
-            "insertions": 10,
-            "deletions": 5,
-        }])
-        
+        await commit_repo.link_to_files(
+            sample_commit.id,
+            [
+                {
+                    "file_id": test_file.id,
+                    "change_type": ChangeType.MODIFIED,
+                    "insertions": 10,
+                    "deletions": 5,
+                }
+            ],
+        )
+
         # List commits for file
         commits = await commit_repo.list_by_file(test_file.id)
-        
+
         assert len(commits) == 1
         assert commits[0].id == sample_commit.id
 
     @pytest.mark.asyncio
     async def test_list_by_task(
-        self, commit_repo: GitCommitRepository, sample_commit: GitCommit, test_task: Task, test_db: AsyncSession
+        self,
+        commit_repo: GitCommitRepository,
+        sample_commit: GitCommit,
+        test_task: Task,
+        test_db: AsyncSession,
     ):
         """Test listing commits linked to a specific task."""
         # Create commit and link to task
         await commit_repo.create(sample_commit)
         await commit_repo.link_to_tasks(sample_commit.id, [test_task.id])
-        
+
         # List commits for task
         commits = await commit_repo.list_by_task(test_task.id)
-        
+
         assert len(commits) == 1
         assert commits[0].id == sample_commit.id
 
     @pytest.mark.asyncio
     async def test_list_by_user(
-        self, commit_repo: GitCommitRepository, sample_commits_batch: list[GitCommit], test_user: User
+        self,
+        commit_repo: GitCommitRepository,
+        sample_commits_batch: list[GitCommit],
+        test_user: User,
     ):
         """Test listing commits by Ardha user."""
         # Create commits
         for commit in sample_commits_batch:
             await commit_repo.create(commit)
-        
+
         # List commits by user
         commits = await commit_repo.list_by_user(test_user.id)
-        
+
         assert len(commits) == len(sample_commits_batch)
         assert all(c.ardha_user_id == test_user.id for c in commits)
 
@@ -330,14 +350,14 @@ class TestGitCommitRepository:
         """Test updating commit fields."""
         # Create commit first
         created_commit = await commit_repo.create(sample_commit)
-        
+
         # Update commit
         update_data = {
             "message": "Updated commit message",
             "pushed_at": datetime.now(timezone.utc),
         }
         updated_commit = await commit_repo.update(created_commit.id, update_data)
-        
+
         assert updated_commit is not None
         assert updated_commit.message == "Updated commit message"
         assert updated_commit.pushed_at is not None
@@ -347,7 +367,7 @@ class TestGitCommitRepository:
         """Test updating non-existent commit."""
         non_existent_id = uuid4()
         update_data = {"message": "Updated"}
-        
+
         updated_commit = await commit_repo.update(non_existent_id, update_data)
         assert updated_commit is None
 
@@ -358,10 +378,10 @@ class TestGitCommitRepository:
         """Test linking a commit to multiple tasks."""
         # Create commit first
         created_commit = await commit_repo.create(sample_commit)
-        
+
         # Link to tasks
         await commit_repo.link_to_tasks(created_commit.id, [test_task.id])
-        
+
         # Verify link was created (by listing commits for task)
         commits = await commit_repo.list_by_task(test_task.id)
         assert len(commits) == 1
@@ -375,14 +395,14 @@ class TestGitCommitRepository:
         # Create commit and link to task
         created_commit = await commit_repo.create(sample_commit)
         await commit_repo.link_to_tasks(created_commit.id, [test_task.id])
-        
+
         # Verify link exists
         commits_before = await commit_repo.list_by_task(test_task.id)
         assert len(commits_before) == 1
-        
+
         # Unlink from task
         await commit_repo.unlink_from_tasks(created_commit.id, [test_task.id])
-        
+
         # Verify link was removed
         commits_after = await commit_repo.list_by_task(test_task.id)
         assert len(commits_after) == 0
@@ -394,17 +414,19 @@ class TestGitCommitRepository:
         """Test linking a commit to files with change details."""
         # Create commit first
         created_commit = await commit_repo.create(sample_commit)
-        
+
         # Link to files
-        file_changes = [{
-            "file_id": test_file.id,
-            "change_type": ChangeType.ADDED,
-            "old_path": None,
-            "insertions": 22,
-            "deletions": 0,
-        }]
+        file_changes = [
+            {
+                "file_id": test_file.id,
+                "change_type": ChangeType.ADDED,
+                "old_path": None,
+                "insertions": 22,
+                "deletions": 0,
+            }
+        ]
         await commit_repo.link_to_files(created_commit.id, file_changes)
-        
+
         # Verify link was created
         result = await commit_repo.get_commit_with_files(created_commit.id)
         assert result is not None
@@ -420,17 +442,22 @@ class TestGitCommitRepository:
         """Test getting commit with file changes."""
         # Create commit and link to file
         await commit_repo.create(sample_commit)
-        await commit_repo.link_to_files(sample_commit.id, [{
-            "file_id": test_file.id,
-            "change_type": ChangeType.MODIFIED,
-            "old_path": "src/old_main.py",
-            "insertions": 10,
-            "deletions": 5,
-        }])
-        
+        await commit_repo.link_to_files(
+            sample_commit.id,
+            [
+                {
+                    "file_id": test_file.id,
+                    "change_type": ChangeType.MODIFIED,
+                    "old_path": "src/old_main.py",
+                    "insertions": 10,
+                    "deletions": 5,
+                }
+            ],
+        )
+
         # Get commit with files
         result = await commit_repo.get_commit_with_files(sample_commit.id)
-        
+
         assert result is not None
         commit, files = result
         assert commit.id == sample_commit.id
@@ -448,15 +475,15 @@ class TestGitCommitRepository:
     ):
         """Test counting commits by project."""
         project_id = sample_commits_batch[0].project_id
-        
+
         # Count before creating
         count_before = await commit_repo.count_by_project(project_id)
         assert count_before == 0
-        
+
         # Create commits
         for commit in sample_commits_batch:
             await commit_repo.create(commit)
-        
+
         # Count after creating
         count_after = await commit_repo.count_by_project(project_id)
         assert count_after == len(sample_commits_batch)
@@ -467,14 +494,14 @@ class TestGitCommitRepository:
     ):
         """Test getting latest commit in a project."""
         project_id = sample_commits_batch[0].project_id
-        
+
         # Create commits
         for commit in sample_commits_batch:
             await commit_repo.create(commit)
-        
+
         # Get latest commit
         latest_commit = await commit_repo.get_latest_commit(project_id)
-        
+
         assert latest_commit is not None
         # Should be the most recent (committed_at DESC)
         all_commits = await commit_repo.list_by_project(project_id)
@@ -487,10 +514,10 @@ class TestGitCommitRepository:
         """Test bulk creating commits."""
         # Bulk create commits
         created_commits = await commit_repo.bulk_create(sample_commits_batch)
-        
+
         assert len(created_commits) == len(sample_commits_batch)
         assert all(c.id is not None for c in created_commits)
-        
+
         # Verify all commits were created
         project_id = sample_commits_batch[0].project_id
         count = await commit_repo.count_by_project(project_id)
@@ -502,18 +529,18 @@ class TestGitCommitRepository:
     ):
         """Test pagination in list_by_project."""
         project_id = sample_commits_batch[0].project_id
-        
+
         # Create commits
         for commit in sample_commits_batch:
             await commit_repo.create(commit)
-        
+
         # Test pagination
         first_page = await commit_repo.list_by_project(project_id, skip=0, limit=2)
         second_page = await commit_repo.list_by_project(project_id, skip=2, limit=2)
-        
+
         assert len(first_page) == 2
         assert len(second_page) == 2
-        
+
         # Ensure no overlap
         first_page_ids = {c.id for c in first_page}
         second_page_ids = {c.id for c in second_page}
@@ -525,20 +552,18 @@ class TestGitCommitRepository:
     ):
         """Test listing commits with date range filter."""
         project_id = sample_commits_batch[0].project_id
-        
+
         # Create commits
         for commit in sample_commits_batch:
             await commit_repo.create(commit)
-        
+
         # Get date range (middle 3 commits)
         since = sample_commits_batch[2].committed_at
         until = sample_commits_batch[1].committed_at
-        
+
         # Filter by date range
-        commits = await commit_repo.list_by_project(
-            project_id, since=since, until=until
-        )
-        
+        commits = await commit_repo.list_by_project(project_id, since=since, until=until)
+
         assert len(commits) == 2  # Should include commits 2 and 1
 
     @pytest.mark.asyncio
@@ -548,12 +573,10 @@ class TestGitCommitRepository:
         """Test linking commit to tasks with specific link type."""
         # Create commit first
         created_commit = await commit_repo.create(sample_commit)
-        
+
         # Link to tasks with custom type
-        await commit_repo.link_to_tasks(
-            created_commit.id, [test_task.id], link_type="closes"
-        )
-        
+        await commit_repo.link_to_tasks(created_commit.id, [test_task.id], link_type="closes")
+
         # Verify link was created
         commits = await commit_repo.list_by_task(test_task.id)
         assert len(commits) == 1
@@ -565,34 +588,37 @@ class TestGitCommitRepository:
     ):
         """Test getting latest commit for specific branch."""
         project_id = sample_commits_batch[0].project_id
-        
+
         # Create commits
         for commit in sample_commits_batch:
             await commit_repo.create(commit)
-        
+
         # Get latest for main branch
         latest_main = await commit_repo.get_latest_commit(project_id, branch="main")
         assert latest_main is not None
-        
+
         # Get latest for non-existent branch
         latest_other = await commit_repo.get_latest_commit(project_id, branch="feature")
         assert latest_other is None
 
     @pytest.mark.asyncio
     async def test_list_by_user_with_project_filter(
-        self, commit_repo: GitCommitRepository, sample_commits_batch: list[GitCommit], test_user: User
+        self,
+        commit_repo: GitCommitRepository,
+        sample_commits_batch: list[GitCommit],
+        test_user: User,
     ):
         """Test listing commits by user with project filter."""
         project_id = sample_commits_batch[0].project_id
-        
+
         # Create commits
         for commit in sample_commits_batch:
             await commit_repo.create(commit)
-        
+
         # List commits by user with project filter
         commits = await commit_repo.list_by_user(test_user.id, project_id=project_id)
         assert len(commits) == len(sample_commits_batch)
-        
+
         # List commits by user without project filter
         all_user_commits = await commit_repo.list_by_user(test_user.id)
         assert len(all_user_commits) == len(sample_commits_batch)

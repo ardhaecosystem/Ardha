@@ -7,10 +7,10 @@ handling all database operations related to git commit history and task/file lin
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import select, and_, or_, func, insert, delete
+from sqlalchemy import and_, delete, func, insert, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -90,11 +90,15 @@ class GitCommitRepository:
             SQLAlchemyError: If database query fails
         """
         try:
-            stmt = select(GitCommit).where(GitCommit.id == commit_id).options(
-                selectinload(GitCommit.project),
-                selectinload(GitCommit.ardha_user),
-                selectinload(GitCommit.files),
-                selectinload(GitCommit.linked_tasks)
+            stmt = (
+                select(GitCommit)
+                .where(GitCommit.id == commit_id)
+                .options(
+                    selectinload(GitCommit.project),
+                    selectinload(GitCommit.ardha_user),
+                    selectinload(GitCommit.files),
+                    selectinload(GitCommit.linked_tasks),
+                )
             )
             result = await self.session.execute(stmt)
             return result.scalar_one_or_none()
@@ -129,10 +133,7 @@ class GitCommitRepository:
                     and_(GitCommit.project_id == project_id, GitCommit.short_sha == sha)
                 )
 
-            stmt = stmt.options(
-                selectinload(GitCommit.project),
-                selectinload(GitCommit.ardha_user)
-            )
+            stmt = stmt.options(selectinload(GitCommit.project), selectinload(GitCommit.ardha_user))
 
             result = await self.session.execute(stmt)
             return result.scalar_one_or_none()
@@ -386,10 +387,7 @@ class GitCommitRepository:
         """
         try:
             stmt = delete(task_commits).where(
-                and_(
-                    task_commits.c.commit_id == commit_id,
-                    task_commits.c.task_id.in_(task_ids)
-                )
+                and_(task_commits.c.commit_id == commit_id, task_commits.c.task_id.in_(task_ids))
             )
 
             result = await self.session.execute(stmt)
@@ -419,14 +417,16 @@ class GitCommitRepository:
             # Prepare bulk insert data
             insert_data = []
             for change in file_changes:
-                insert_data.append({
-                    "file_id": change["file_id"],
-                    "commit_id": commit_id,
-                    "change_type": change["change_type"].value,
-                    "old_path": change.get("old_path"),
-                    "insertions": change.get("insertions", 0),
-                    "deletions": change.get("deletions", 0),
-                })
+                insert_data.append(
+                    {
+                        "file_id": change["file_id"],
+                        "commit_id": commit_id,
+                        "change_type": change["change_type"].value,
+                        "old_path": change.get("old_path"),
+                        "insertions": change.get("insertions", 0),
+                        "deletions": change.get("deletions", 0),
+                    }
+                )
 
             # Clear existing file links for this commit
             await self.session.execute(
@@ -561,7 +561,9 @@ class GitCommitRepository:
             result = await self.session.execute(stmt)
             return result.scalar_one_or_none()
         except SQLAlchemyError as e:
-            logger.error(f"Error getting latest commit for project {project_id}: {e}", exc_info=True)
+            logger.error(
+                f"Error getting latest commit for project {project_id}: {e}", exc_info=True
+            )
             raise
 
     async def bulk_create(self, commits: List[GitCommit]) -> List[GitCommit]:
@@ -580,11 +582,11 @@ class GitCommitRepository:
         try:
             self.session.add_all(commits)
             await self.session.commit()
-            
+
             # Refresh all commits to get their IDs
             for commit in commits:
                 await self.session.refresh(commit)
-            
+
             logger.info(f"Bulk created {len(commits)} git commits")
             return commits
         except IntegrityError as e:

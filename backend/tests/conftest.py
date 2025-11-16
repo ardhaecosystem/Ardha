@@ -5,7 +5,6 @@ This module provides pytest fixtures for database setup, test clients,
 and common test data used across unit and integration tests.
 """
 
-import asyncio
 from typing import AsyncGenerator
 
 import pytest
@@ -555,7 +554,6 @@ async def sample_proposals_batch(openspec_dependencies):
         List of 5 proposal data dictionaries with different statuses
     """
     from datetime import UTC, datetime
-    from uuid import uuid4
 
     user_id, project_id = openspec_dependencies
 
@@ -641,7 +639,7 @@ async def test_openspec_proposal(
     Returns:
         Dictionary with proposal data
     """
-    from datetime import UTC, datetime
+    from datetime import datetime
 
     from ardha.models.openspec import OpenSpecProposal
 

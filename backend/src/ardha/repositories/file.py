@@ -8,10 +8,10 @@ handling all database operations related to file management and git tracking.
 import logging
 from datetime import datetime
 from hashlib import sha256
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -90,10 +90,14 @@ class FileRepository:
             SQLAlchemyError: If database query fails
         """
         try:
-            stmt = select(File).where(File.id == file_id).options(
-                selectinload(File.project),
-                selectinload(File.last_modified_by),
-                selectinload(File.commits)
+            stmt = (
+                select(File)
+                .where(File.id == file_id)
+                .options(
+                    selectinload(File.project),
+                    selectinload(File.last_modified_by),
+                    selectinload(File.commits),
+                )
             )
             result = await self.session.execute(stmt)
             return result.scalar_one_or_none()
@@ -116,11 +120,10 @@ class FileRepository:
             SQLAlchemyError: If database query fails
         """
         try:
-            stmt = select(File).where(
-                and_(File.project_id == project_id, File.path == path)
-            ).options(
-                selectinload(File.project),
-                selectinload(File.last_modified_by)
+            stmt = (
+                select(File)
+                .where(and_(File.project_id == project_id, File.path == path))
+                .options(selectinload(File.project), selectinload(File.last_modified_by))
             )
             result = await self.session.execute(stmt)
             return result.scalar_one_or_none()
@@ -196,8 +199,8 @@ class FileRepository:
         """
         try:
             # Normalize directory path
-            if not directory.endswith('/'):
-                directory += '/'
+            if not directory.endswith("/"):
+                directory += "/"
 
             if recursive:
                 # Match directory and all subdirectories
@@ -205,7 +208,7 @@ class FileRepository:
                     and_(
                         File.project_id == project_id,
                         File.path.like(f"{directory}%"),
-                        File.is_deleted == False
+                        File.is_deleted == False,
                     )
                 )
             else:
@@ -215,7 +218,7 @@ class FileRepository:
                         File.project_id == project_id,
                         File.path.like(f"{directory}%"),
                         ~File.path.like(f"{directory}%/%"),  # No additional subdirectories
-                        File.is_deleted == False
+                        File.is_deleted == False,
                     )
                 )
 
@@ -250,27 +253,19 @@ class FileRepository:
             # Build search conditions
             name_condition = File.name.ilike(f"%{query}%")
             path_condition = File.path.ilike(f"%{query}%")
-            
+
             # Base conditions
-            base_conditions = [
-                File.project_id == project_id,
-                File.is_deleted == False
-            ]
-            
+            base_conditions = [File.project_id == project_id, File.is_deleted == False]
+
             # Search conditions (name or path)
             search_conditions = [name_condition, path_condition]
-            
+
             # Add content search if requested
             if search_content:
                 content_condition = File.content.ilike(f"%{query}%")
                 search_conditions.append(content_condition)
-            
-            stmt = select(File).where(
-                and_(
-                    *base_conditions,
-                    or_(*search_conditions)
-                )
-            )
+
+            stmt = select(File).where(and_(*base_conditions, or_(*search_conditions)))
 
             stmt = stmt.order_by(File.path)
             result = await self.session.execute(stmt)
@@ -306,7 +301,7 @@ class FileRepository:
             # Update fields
             for key, value in update_data.items():
                 if hasattr(file, key):
-                    if key == 'content' and value != old_content:
+                    if key == "content" and value != old_content:
                         content_changed = True
                     setattr(file, key, value)
                 else:
@@ -543,8 +538,10 @@ class FileRepository:
             from ardha.models.git_commit import GitCommit
 
             # Get file with commits
-            stmt = select(File).where(File.id == file_id).options(
-                selectinload(File.commits).joinedload(GitCommit.ardha_user)
+            stmt = (
+                select(File)
+                .where(File.id == file_id)
+                .options(selectinload(File.commits).joinedload(GitCommit.ardha_user))
             )
             result = await self.session.execute(stmt)
             file = result.scalar_one_or_none()
@@ -577,11 +574,11 @@ class FileRepository:
         try:
             self.session.add_all(files)
             await self.session.commit()
-            
+
             # Refresh all files to get their IDs
             for file in files:
                 await self.session.refresh(file)
-            
+
             logger.info(f"Bulk created {len(files)} files")
             return files
         except IntegrityError as e:
@@ -612,13 +609,17 @@ class FileRepository:
             SQLAlchemyError: If database query fails
         """
         try:
-            stmt = select(File).where(
-                and_(
-                    File.project_id == project_id,
-                    File.last_modified_at > since,
-                    File.is_deleted == False
+            stmt = (
+                select(File)
+                .where(
+                    and_(
+                        File.project_id == project_id,
+                        File.last_modified_at > since,
+                        File.is_deleted == False,
+                    )
                 )
-            ).order_by(File.last_modified_at.desc())
+                .order_by(File.last_modified_at.desc())
+            )
 
             result = await self.session.execute(stmt)
             return list(result.scalars().all())
