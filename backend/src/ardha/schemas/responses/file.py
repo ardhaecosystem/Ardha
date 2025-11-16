@@ -5,25 +5,25 @@ This module defines Pydantic schemas for file-related API responses.
 """
 
 from datetime import datetime
-from uuid import UUID
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ardha.schemas.file import FileResponse, FileWithContent, FileListResponse
+from ardha.schemas.file import FileListResponse, FileResponse, FileWithContent
 
 
 class FileWithContentResponse(FileWithContent):
     """Schema for file response with full content."""
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class FileHistoryResponse(BaseModel):
     """Schema for file history response."""
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     sha: str
     short_sha: str
@@ -39,7 +39,7 @@ class FileHistoryResponse(BaseModel):
 
 class FileSearchResponse(BaseModel):
     """Schema for file search response."""
-    
+
     files: list[FileResponse]
     total: int
     query: str
@@ -50,7 +50,7 @@ class FileSearchResponse(BaseModel):
 
 class FileStatsResponse(BaseModel):
     """Schema for file statistics response."""
-    
+
     total_files: int
     total_size_bytes: int
     file_types: dict[str, int]
@@ -61,7 +61,7 @@ class FileStatsResponse(BaseModel):
 
 class FileSyncResponse(BaseModel):
     """Schema for file sync response."""
-    
+
     synced_count: int
     new_files: int
     updated_files: int
@@ -71,7 +71,7 @@ class FileSyncResponse(BaseModel):
 
 class FileOperationResponse(BaseModel):
     """Schema for file operation responses (create, update, delete, rename)."""
-    
+
     success: bool = True
     message: str
     file: Optional[FileResponse] = None

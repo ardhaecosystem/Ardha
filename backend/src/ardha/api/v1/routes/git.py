@@ -21,19 +21,17 @@ from ardha.schemas.requests.git_commit import (
     SyncCommitsRequest,
 )
 from ardha.schemas.responses.git_commit import (
-    GitCommitResponse,
     GitCommitListResponse,
-    GitCommitWithFilesResponse,
+    GitCommitResponse,
     GitCommitStatsResponse,
+    GitCommitWithFilesResponse,
     GitSyncResponse,
-    GitOperationResponse,
 )
 from ardha.services.git_commit_service import (
     GitCommitNotFoundError,
     GitCommitPermissionError,
-    GitCommitValidationError,
-    GitCommitOperationError,
     GitCommitService,
+    GitCommitValidationError,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,22 +53,21 @@ async def create_commit(
 ) -> GitCommitResponse:
     """
     Create a new git commit.
-    
+
     - **project_id**: Project UUID (required)
     - **message**: Commit message (required)
     - **author_name**: Optional author name override
     - **author_email**: Optional author email override
     - **file_ids**: Optional specific files to commit
-    
+
     Returns created commit with metadata.
     User must be at least a project member.
     """
     try:
         from ardha.core.config import get_settings
-        
-        settings = get_settings()
-        
-        service = GitCommitService(db, "/tmp/ardha")
+
+        import tempfile
+        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
         commit = await service.create_commit(
             project_id=commit_data.project_id,
             message=commit_data.message,
@@ -79,9 +76,9 @@ async def create_commit(
             author_email=commit_data.author_email,
             file_ids=commit_data.file_ids,
         )
-        
+
         return GitCommitResponse.model_validate(commit)
-        
+
     except GitCommitPermissionError as e:
         logger.warning(f"Permission denied creating commit: {e}")
         raise HTTPException(
@@ -115,21 +112,20 @@ async def get_commit(
 ) -> GitCommitResponse:
     """
     Get commit by ID.
-    
+
     User must be a project member to view commits.
-    
+
     Returns commit metadata.
     """
     try:
         from ardha.core.config import get_settings
-        
-        settings = get_settings()
-        
-        service = GitCommitService(db, "/tmp/ardha")
+
+        import tempfile
+        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
         commit = await service.get_commit(commit_id, current_user.id)
-        
+
         return GitCommitResponse.model_validate(commit)
-        
+
     except GitCommitNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -169,7 +165,7 @@ async def list_commits(
 ) -> GitCommitListResponse:
     """
     List commits in a project.
-    
+
     Query parameters:
     - **branch**: Filter by branch name
     - **author_email**: Filter by author email
@@ -178,17 +174,16 @@ async def list_commits(
     - **search**: Search in commit messages
     - **skip**: Number of records to skip (pagination, default: 0)
     - **limit**: Maximum records to return (1-100, default: 50)
-    
+
     User must be a project member to view commits.
-    
+
     Returns paginated list of commits.
     """
     try:
         from ardha.core.config import get_settings
-        
-        settings = get_settings()
-        
-        service = GitCommitService(db, "/tmp/ardha")
+
+        import tempfile
+        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
         commits, total = await service.list_commits(
             project_id=project_id,
             user_id=current_user.id,
@@ -200,7 +195,7 @@ async def list_commits(
             skip=skip,
             limit=limit,
         )
-        
+
         return GitCommitListResponse(
             commits=[GitCommitResponse.model_validate(c) for c in commits],
             total=total,
@@ -209,7 +204,7 @@ async def list_commits(
             has_next=skip + limit < total,
             branch=branch or "all",
         )
-        
+
     except GitCommitPermissionError as e:
         logger.warning(f"Permission denied listing commits: {e}")
         raise HTTPException(
@@ -238,29 +233,28 @@ async def link_commit_to_tasks(
 ) -> GitCommitResponse:
     """
     Link commit to tasks.
-    
+
     - **task_ids**: List of task identifiers (required)
     - **link_type**: Type of link (mentioned/closes, default: mentioned)
-    
+
     Requires at least project member role.
-    
+
     Returns updated commit with task links.
     """
     try:
         from ardha.core.config import get_settings
-        
-        settings = get_settings()
-        
-        service = GitCommitService(db, "/tmp/ardha")
+
+        import tempfile
+        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
         commit = await service.link_commit_to_tasks(
             commit_id=commit_id,
             user_id=current_user.id,
             task_ids=link_data.task_ids,
             link_type=link_data.link_type,
         )
-        
+
         return GitCommitResponse.model_validate(commit)
-        
+
     except GitCommitNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -293,19 +287,18 @@ async def get_commit_with_files(
 ) -> GitCommitWithFilesResponse:
     """
     Get commit with file changes.
-    
+
     User must be a project member to view commit details.
-    
+
     Returns commit with detailed file changes.
     """
     try:
         from ardha.core.config import get_settings
-        
-        settings = get_settings()
-        
-        service = GitCommitService(db, "/tmp/ardha")
+
+        import tempfile
+        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
         commit, file_changes = await service.get_commit_with_files(commit_id, current_user.id)
-        
+
         return GitCommitWithFilesResponse(
             id=commit.id,
             sha=commit.sha,
@@ -323,7 +316,7 @@ async def get_commit_with_files(
             closes_task_ids=commit.closes_task_ids or [],
             file_changes=[],  # Simplified for now
         )
-        
+
     except GitCommitNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -357,24 +350,23 @@ async def get_file_commits(
 ) -> list[GitCommitResponse]:
     """
     Get commits that changed a specific file.
-    
+
     Query parameters:
     - **max_count**: Maximum number of commits to return (1-100, default: 50)
-    
+
     User must be a project member to view file commits.
-    
+
     Returns list of commits that modified the file.
     """
     try:
         from ardha.core.config import get_settings
-        
-        settings = get_settings()
-        
-        service = GitCommitService(db, "/tmp/ardha")
+
+        import tempfile
+        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
         commits = await service.get_file_commits(file_id, current_user.id, max_count)
-        
+
         return [GitCommitResponse.model_validate(c) for c in commits]
-        
+
     except GitCommitPermissionError as e:
         logger.warning(f"Permission denied accessing file commits: {e}")
         raise HTTPException(
@@ -405,22 +397,21 @@ async def get_user_commits(
 ) -> list[GitCommitResponse]:
     """
     Get commits by a specific user.
-    
+
     Query parameters:
     - **project_id**: Filter by project UUID
     - **skip**: Number of records to skip (pagination, default: 0)
     - **limit**: Maximum records to return (1-100, default: 50)
-    
+
     User must be a project member to view user commits.
-    
+
     Returns list of commits by the specified user.
     """
     try:
         from ardha.core.config import get_settings
-        
-        settings = get_settings()
-        
-        service = GitCommitService(db, "/tmp/ardha")
+
+        import tempfile
+        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
         commits = await service.get_user_commits(
             user_id=user_id,
             requesting_user_id=requesting_user.id,
@@ -428,9 +419,9 @@ async def get_user_commits(
             skip=skip,
             limit=limit,
         )
-        
+
         return [GitCommitResponse.model_validate(c) for c in commits]
-        
+
     except GitCommitPermissionError as e:
         logger.warning(f"Permission denied accessing user commits: {e}")
         raise HTTPException(
@@ -459,30 +450,29 @@ async def get_latest_commit(
 ) -> GitCommitResponse:
     """
     Get most recent commit in a project.
-    
+
     Query parameters:
     - **branch**: Optional branch filter
-    
+
     User must be a project member to view commits.
-    
+
     Returns latest commit or None if no commits exist.
     """
     try:
         from ardha.core.config import get_settings
-        
-        settings = get_settings()
-        
-        service = GitCommitService(db, "/tmp/ardha")
+
+        import tempfile
+        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
         commit = await service.get_latest_commit(project_id, current_user.id, branch)
-        
+
         if not commit:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No commits found in project",
             )
-        
+
         return GitCommitResponse.model_validate(commit)
-        
+
     except GitCommitPermissionError as e:
         logger.warning(f"Permission denied accessing latest commit: {e}")
         raise HTTPException(
@@ -511,34 +501,33 @@ async def sync_commits(
 ) -> GitSyncResponse:
     """
     Sync commits from git repository to database.
-    
+
     - **branch**: Optional branch filter
     - **since**: Optional start date filter
-    
+
     Requires project admin or owner role.
-    
+
     Returns sync statistics.
     """
     try:
         from ardha.core.config import get_settings
-        
-        settings = get_settings()
-        
-        service = GitCommitService(db, "/tmp/ardha")
+
+        import tempfile
+        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
         stats = await service.sync_commits_from_git(
             project_id=project_id,
             user_id=current_user.id,
             branch=sync_data.branch,
             since=sync_data.since,
         )
-        
+
         return GitSyncResponse(
             synced_commits=stats["synced_count"],
             new_commits=stats["new_commits"],
             updated_commits=stats["updated_commits"],
             linked_tasks=0,
         )
-        
+
     except GitCommitPermissionError as e:
         logger.warning(f"Permission denied syncing commits: {e}")
         raise HTTPException(
@@ -567,22 +556,21 @@ async def get_commit_stats(
 ) -> GitCommitStatsResponse:
     """
     Get commit statistics for a project.
-    
+
     Query parameters:
     - **branch**: Optional branch filter
-    
+
     User must be a project member to view commit stats.
-    
+
     Returns comprehensive commit statistics.
     """
     try:
         from ardha.core.config import get_settings
-        
-        settings = get_settings()
-        
-        service = GitCommitService(db, "/tmp/ardha")
+
+        import tempfile
+        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
         stats = await service.get_commit_stats(project_id, current_user.id, branch)
-        
+
         return GitCommitStatsResponse(
             total_commits=stats["total_commits"],
             total_insertions=stats["total_insertions"],
@@ -591,7 +579,7 @@ async def get_commit_stats(
             branches=stats["branches"],
             top_contributors=stats["top_contributors"],
         )
-        
+
     except GitCommitPermissionError as e:
         logger.warning(f"Permission denied accessing commit stats: {e}")
         raise HTTPException(
@@ -619,17 +607,17 @@ async def get_project_branches(
 ) -> list[str]:
     """
     Get all branches in a project.
-    
+
     User must be a project member to view branches.
-    
+
     Returns list of branch names.
     """
     try:
         from ardha.core.config import get_settings
         from ardha.services.project_service import ProjectService
-        
+
         settings = get_settings()
-        
+
         # Check project permissions first
         project_service = ProjectService(db)
         if not await project_service.check_permission(project_id, current_user.id, "viewer"):
@@ -637,22 +625,23 @@ async def get_project_branches(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Must be a project member to view branches",
             )
-        
+
         # Get branches from git service
-        git_service = GitCommitService(db, "/tmp/ardha")
+        import tempfile
+        git_service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
         commits, _ = await git_service.list_commits(
             project_id=project_id,
             user_id=current_user.id,
             skip=0,
             limit=1000,  # Get many commits to find all branches
         )
-        
+
         # Extract unique branches from commits
         branches = list(set(commit.branch for commit in commits if commit.branch))
         branches.sort()
-        
+
         return branches
-        
+
     except HTTPException:
         raise
     except Exception as e:

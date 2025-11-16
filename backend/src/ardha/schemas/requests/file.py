@@ -5,6 +5,7 @@ This module defines Pydantic schemas for file-related API requests.
 """
 
 from uuid import UUID
+
 from pydantic import BaseModel, Field, field_validator
 
 from ardha.schemas.file import FileType
@@ -14,7 +15,9 @@ class CreateFileRequest(BaseModel):
     """Schema for creating a new file."""
 
     project_id: UUID = Field(..., description="Project UUID")
-    path: str = Field(..., min_length=1, max_length=1024, description="Relative path from project root")
+    path: str = Field(
+        ..., min_length=1, max_length=1024, description="Relative path from project root"
+    )
     content: str = Field(..., description="File content")
     commit: bool = Field(False, description="Whether to commit the file creation")
     commit_message: str | None = Field(None, description="Custom commit message if committing")

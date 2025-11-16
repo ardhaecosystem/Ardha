@@ -18,7 +18,9 @@ class CreateCommitRequest(BaseModel):
 
     project_id: UUID = Field(..., description="Project UUID")
     message: str = Field(..., min_length=1, max_length=10000, description="Commit message")
-    file_ids: Optional[list[UUID]] = Field(None, description="Specific files to commit (null for all staged)")
+    file_ids: Optional[list[UUID]] = Field(
+        None, description="Specific files to commit (null for all staged)"
+    )
     author_name: Optional[str] = Field(None, description="Override git author name")
     author_email: Optional[str] = Field(None, description="Override git author email")
 

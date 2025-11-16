@@ -18,22 +18,21 @@ from ardha.core.security import get_current_active_user
 from ardha.models.user import User
 from ardha.schemas.requests.file import (
     CreateFileRequest,
-    UpdateFileContentRequest,
     RenameFileRequest,
+    UpdateFileContentRequest,
 )
 from ardha.schemas.responses.file import (
+    FileHistoryResponse,
+    FileListResponse,
+    FileOperationResponse,
     FileResponse,
     FileWithContentResponse,
-    FileListResponse,
-    FileHistoryResponse,
-    FileOperationResponse,
 )
 from ardha.services.file_service import (
     FileNotFoundError,
     FilePermissionError,
-    FileValidationError,
-    FileOperationError,
     FileService,
+    FileValidationError,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,21 +54,23 @@ async def create_file(
 ) -> FileResponse:
     """
     Create a new file.
-    
+
     - **project_id**: Project UUID (required)
     - **path**: Relative file path (required)
     - **content**: File content (required)
     - **commit**: Whether to create git commit (default: false)
     - **commit_message**: Custom commit message
-    
+
     Returns the created file with metadata.
     User must be at least a project member.
     """
     try:
         from ardha.core.config import get_settings
+
         settings = get_settings()
-        
-        service = FileService(db, Path("/tmp/ardha"))
+
+        import tempfile
+        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
         file = await service.create_file(
             project_id=file_data.project_id,
             file_path=file_data.path,
@@ -78,9 +79,9 @@ async def create_file(
             commit=file_data.commit,
             commit_message=file_data.commit_message,
         )
-        
+
         return FileResponse.model_validate(file)
-        
+
     except FilePermissionError as e:
         logger.warning(f"Permission denied creating file: {e}")
         raise HTTPException(
@@ -114,20 +115,22 @@ async def get_file(
 ) -> FileResponse:
     """
     Get file by ID.
-    
+
     User must be a project member to view files.
-    
+
     Returns file metadata without content.
     """
     try:
         from ardha.core.config import get_settings
+
         settings = get_settings()
-        
-        service = FileService(db, Path("/tmp/ardha"))
+
+        import tempfile
+        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
         file = await service.get_file(file_id, current_user.id)
-        
+
         return FileResponse.model_validate(file)
-        
+
     except FileNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -161,28 +164,30 @@ async def get_file_content(
 ) -> FileWithContentResponse:
     """
     Get file with content.
-    
+
     Query parameters:
     - **ref**: Git reference (commit SHA, branch, tag, default: HEAD)
-    
+
     User must be a project member to view file content.
-    
+
     Returns file with full content.
     """
     try:
         from ardha.core.config import get_settings
+
         settings = get_settings()
-        
-        service = FileService(db, Path("/tmp/ardha"))
+
+        import tempfile
+        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
         file = await service.get_file(file_id, current_user.id)
         content = await service.get_file_content(file_id, current_user.id, ref)
-        
+
         # Create response with content
         response = FileWithContentResponse.model_validate(file)
         response.content = content
-        
+
         return response
-        
+
     except FileNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -216,20 +221,22 @@ async def update_file_content(
 ) -> FileResponse:
     """
     Update file content.
-    
+
     - **content**: New file content (required)
     - **commit**: Whether to create git commit (default: false)
     - **commit_message**: Custom commit message
-    
+
     Requires at least project member role.
-    
+
     Returns updated file metadata.
     """
     try:
         from ardha.core.config import get_settings
+
         settings = get_settings()
-        
-        service = FileService(db, Path("/tmp/ardha"))
+
+        import tempfile
+        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
         file = await service.update_file_content(
             file_id=file_id,
             content=update_data.content,
@@ -237,9 +244,9 @@ async def update_file_content(
             commit=update_data.commit,
             commit_message=update_data.commit_message,
         )
-        
+
         return FileResponse.model_validate(file)
-        
+
     except FileNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -279,20 +286,22 @@ async def rename_file(
 ) -> FileResponse:
     """
     Rename/move file.
-    
+
     - **new_path**: New file path (required)
     - **commit**: Whether to create git commit (default: false)
     - **commit_message**: Custom commit message
-    
+
     Requires at least project member role.
-    
+
     Returns updated file metadata.
     """
     try:
         from ardha.core.config import get_settings
+
         settings = get_settings()
-        
-        service = FileService(db, Path("/tmp/ardha"))
+
+        import tempfile
+        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
         file = await service.rename_file(
             file_id=file_id,
             new_path=rename_data.new_path,
@@ -300,9 +309,9 @@ async def rename_file(
             commit=rename_data.commit,
             commit_message=rename_data.commit_message,
         )
-        
+
         return FileResponse.model_validate(file)
-        
+
     except FileNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -343,33 +352,35 @@ async def delete_file(
 ) -> FileOperationResponse:
     """
     Delete file.
-    
+
     Query parameters:
     - **commit**: Whether to create git commit (default: false)
     - **commit_message**: Custom commit message
-    
+
     Requires project admin or owner role.
     This is a soft delete - file can be restored.
-    
+
     Returns operation result.
     """
     try:
         from ardha.core.config import get_settings
+
         settings = get_settings()
-        
-        service = FileService(db, Path("/tmp/ardha"))
+
+        import tempfile
+        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
         success = await service.delete_file(
             file_id=file_id,
             user_id=current_user.id,
             commit=commit,
             commit_message=commit_message,
         )
-        
+
         return FileOperationResponse(
             success=success,
             message="File deleted successfully" if success else "Failed to delete file",
         )
-        
+
     except FileNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -408,7 +419,7 @@ async def list_project_files(
 ) -> FileListResponse:
     """
     List files in a project.
-    
+
     Query parameters:
     - **directory**: Filter by directory path
     - **file_type**: Filter by file type (code, doc, config, test, asset, other)
@@ -416,19 +427,20 @@ async def list_project_files(
     - **include_deleted**: Include soft-deleted files (default: false)
     - **skip**: Number of records to skip (pagination, default: 0)
     - **limit**: Maximum records to return (1-100, default: 50)
-    
+
     User must be a project member to view files.
-    
+
     Returns paginated list of files.
     """
     try:
         from ardha.core.config import get_settings
         from ardha.schemas.file import FileType
-        
+
         settings = get_settings()
-        
-        service = FileService(db, Path("/tmp/ardha"))
-        
+
+        import tempfile
+        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
+
         # Convert file_type string to enum if provided
         file_type_enum = None
         if file_type:
@@ -439,7 +451,7 @@ async def list_project_files(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Invalid file type: {file_type}",
                 )
-        
+
         files, total = await service.list_project_files(
             project_id=project_id,
             user_id=current_user.id,
@@ -450,7 +462,7 @@ async def list_project_files(
             skip=skip,
             limit=limit,
         )
-        
+
         return FileListResponse(
             files=[FileResponse.model_validate(f) for f in files],
             total=total,
@@ -458,7 +470,7 @@ async def list_project_files(
             page_size=limit,
             has_next=skip + limit < total,
         )
-        
+
     except FilePermissionError as e:
         logger.warning(f"Permission denied listing files: {e}")
         raise HTTPException(
@@ -489,43 +501,44 @@ async def get_file_history(
 ) -> FileHistoryResponse:
     """
     Get file with commit history.
-    
+
     Query parameters:
     - **max_commits**: Maximum number of commits to return (1-100, default: 50)
-    
+
     User must be a project member to view file history.
-    
+
     Returns file with commit history.
     """
     try:
         from ardha.core.config import get_settings
-        
-        settings = get_settings()
-        
-        service = FileService(db, Path("/tmp/ardha"))
+
+        import tempfile
+        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
         file, commits = await service.get_file_history(
             file_id=file_id,
             user_id=current_user.id,
             max_commits=max_commits,
         )
-        
+
         # Convert commits to response format
         commit_responses = []
         for commit in commits:
-            commit_responses.append(FileHistoryResponse(
-                id=file_id,  # Using file_id as placeholder
-                sha=commit["sha"],
-                short_sha=commit["short_sha"],
-                message=commit["message"],
-                author_name=commit["author_name"],
-                author_email=commit["author_email"],
-                committed_at=commit["date"],
-                change_type="modified",  # Default for history
-                insertions=commit.get("changes", {}).get("insertions", 0),
-                deletions=commit.get("changes", {}).get("deletions", 0),
-                time_ago=None,  # Could calculate this
-            ))
-        
+            commit_responses.append(
+                FileHistoryResponse(
+                    id=file_id,  # Using file_id as placeholder
+                    sha=commit["sha"],
+                    short_sha=commit["short_sha"],
+                    message=commit["message"],
+                    author_name=commit["author_name"],
+                    author_email=commit["author_email"],
+                    committed_at=commit["date"],
+                    change_type="modified",  # Default for history
+                    insertions=commit.get("changes", {}).get("insertions", 0),
+                    deletions=commit.get("changes", {}).get("deletions", 0),
+                    time_ago=None,  # Could calculate this
+                )
+            )
+
         return FileHistoryResponse(
             id=file_id,
             sha=commit_responses[0].sha if commit_responses else "",
@@ -537,7 +550,7 @@ async def get_file_history(
             change_type="modified",
             time_ago=None,
         )
-        
+
     except FileNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

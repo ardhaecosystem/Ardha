@@ -46,8 +46,9 @@ async def test_get_commit_details_not_found(client: AsyncClient, test_user: dict
     """Test getting non-existent commit details."""
     # Test with random UUID
     import uuid
+
     fake_commit_id = str(uuid.uuid4())
-    
+
     response = await client.get(
         f"/api/v1/git/commits/{fake_commit_id}",
         headers={"Authorization": f"Bearer {test_user['token']}"},
@@ -82,8 +83,9 @@ async def test_list_commits_empty(client: AsyncClient, test_user: dict) -> None:
 async def test_link_commit_to_tasks_not_found(client: AsyncClient, test_user: dict) -> None:
     """Test linking tasks to non-existent commit."""
     import uuid
+
     fake_commit_id = str(uuid.uuid4())
-    
+
     response = await client.post(
         f"/api/v1/git/commits/{fake_commit_id}/link-tasks",
         headers={"Authorization": f"Bearer {test_user['token']}"},
@@ -99,8 +101,9 @@ async def test_link_commit_to_tasks_not_found(client: AsyncClient, test_user: di
 async def test_get_commit_with_files_not_found(client: AsyncClient, test_user: dict) -> None:
     """Test getting file changes for non-existent commit."""
     import uuid
+
     fake_commit_id = str(uuid.uuid4())
-    
+
     response = await client.get(
         f"/api/v1/git/commits/{fake_commit_id}/files",
         headers={"Authorization": f"Bearer {test_user['token']}"},
@@ -112,8 +115,9 @@ async def test_get_commit_with_files_not_found(client: AsyncClient, test_user: d
 async def test_get_user_commits_empty(client: AsyncClient, test_user: dict) -> None:
     """Test getting commits by a specific user (empty list)."""
     # Get commits by user (should be empty)
+    user_id = test_user['user']['id']
     response = await client.get(
-        f"/api/v1/git/users/{test_user['user']['id']}/commits",
+        f"/api/v1/git/users/{user_id}/commits",
         headers={"Authorization": f"Bearer {test_user['token']}"},
     )
     assert response.status_code == 200
