@@ -7,7 +7,6 @@ handling all database operations related to file management and git tracking.
 
 import logging
 from datetime import datetime
-from hashlib import sha256
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -92,7 +91,7 @@ class FileRepository:
         try:
             stmt = (
                 select(File)
-                .where(and_(File.id == file_id, File.is_deleted == False))
+                .where(and_(File.id == file_id, File.is_deleted.is_(False)))
                 .options(
                     selectinload(File.project),
                     selectinload(File.last_modified_by),
@@ -166,7 +165,7 @@ class FileRepository:
             if language:
                 stmt = stmt.where(File.language == language)
             if not include_deleted:
-                stmt = stmt.where(File.is_deleted == False)
+                stmt = stmt.where(File.is_deleted.is_(False))
 
             # Apply pagination and ordering
             stmt = stmt.order_by(File.path).offset(skip).limit(min(limit, 100))
@@ -208,7 +207,7 @@ class FileRepository:
                     and_(
                         File.project_id == project_id,
                         File.path.like(f"{directory}%"),
-                        File.is_deleted == False,
+                        File.is_deleted.is_(False),
                     )
                 )
             else:
@@ -218,7 +217,7 @@ class FileRepository:
                         File.project_id == project_id,
                         File.path.like(f"{directory}%"),
                         ~File.path.like(f"{directory}%/%"),  # No additional subdirectories
-                        File.is_deleted == False,
+                        File.is_deleted.is_(False),
                     )
                 )
 
@@ -255,7 +254,7 @@ class FileRepository:
             path_condition = File.path.ilike(f"%{query}%")
 
             # Base conditions
-            base_conditions = [File.project_id == project_id, File.is_deleted == False]
+            base_conditions = [File.project_id == project_id, File.is_deleted.is_(False)]
 
             # Search conditions (name or path)
             search_conditions = [name_condition, path_condition]
@@ -507,7 +506,7 @@ class FileRepository:
             if file_type:
                 stmt = stmt.where(File.file_type == file_type.value)
             if not include_deleted:
-                stmt = stmt.where(File.is_deleted == False)
+                stmt = stmt.where(File.is_deleted.is_(False))
 
             result = await self.session.execute(stmt)
             return result.scalar() or 0
@@ -615,7 +614,7 @@ class FileRepository:
                     and_(
                         File.project_id == project_id,
                         File.last_modified_at > since,
-                        File.is_deleted == False,
+                        File.is_deleted.is_(False),
                     )
                 )
                 .order_by(File.last_modified_at.desc())

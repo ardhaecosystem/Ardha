@@ -778,7 +778,16 @@ class GitService:
         except GitCommandError as e:
             logger.error(f"Failed to push: {e}")
             error_msg = str(e).lower()
-            if any(keyword in error_msg for keyword in ["authentication", "credential", "username", "password", "could not read"]):
+            if any(
+                keyword in error_msg
+                for keyword in [
+                    "authentication",
+                    "credential",
+                    "username",
+                    "password",
+                    "could not read",
+                ]
+            ):
                 raise GitAuthenticationError(f"Authentication failed for push: {e}")
             raise GitPushError(f"Failed to push: {e}")
 
@@ -834,7 +843,16 @@ class GitService:
         except GitCommandError as e:
             logger.error(f"Failed to pull: {e}")
             error_msg = str(e).lower()
-            if any(keyword in error_msg for keyword in ["authentication", "credential", "username", "password", "could not read"]):
+            if any(
+                keyword in error_msg
+                for keyword in [
+                    "authentication",
+                    "credential",
+                    "username",
+                    "password",
+                    "could not read",
+                ]
+            ):
                 raise GitAuthenticationError(f"Authentication failed for pull: {e}")
             raise GitPullError(f"Failed to pull: {e}")
 

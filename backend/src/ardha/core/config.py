@@ -127,9 +127,7 @@ class FileSettings(BaseModel):
     max_file_size: int = Field(
         default=10485760, ge=1024, description="Maximum file size in bytes"  # 10MB  # 1KB minimum
     )
-    project_root: str = Field(
-        default="./projects", description="Root directory for project files"
-    )
+    project_root: str = Field(default="./projects", description="Root directory for project files")
 
 
 class RateLimitSettings(BaseModel):
