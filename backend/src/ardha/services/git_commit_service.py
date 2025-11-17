@@ -687,6 +687,212 @@ class GitCommitService:
             logger.error(f"Failed to get commit stats for project {project_id}: {e}")
             raise GitCommitOperationError(f"Failed to get commit stats: {e}")
 
+    async def get_commit_diff(
+        self,
+        commit_id: UUID,
+        user_id: UUID,
+    ) -> str:
+        """
+        Get unified diff for a commit.
+
+        Args:
+            commit_id: Commit UUID
+            user_id: User requesting diff
+
+        Returns:
+            Unified diff string
+
+        Raises:
+            GitCommitNotFoundError: If commit not found
+            GitCommitPermissionError: If user lacks permissions
+        """
+        commit = await self.get_commit(commit_id, user_id)
+
+        try:
+            # Get diff from git
+            diff = self.git_service.get_diff(ref1=f"{commit.sha}^", ref2=commit.sha)
+            return diff
+
+        except Exception as e:
+            logger.error(f"Failed to get diff for commit {commit_id}: {e}")
+            raise GitCommitOperationError(f"Failed to get commit diff: {e}")
+
+    async def push_commits(
+        self,
+        project_id: UUID,
+        user_id: UUID,
+        branch: Optional[str] = None,
+        remote: str = "origin",
+        force: bool = False,
+    ) -> dict:
+        """
+        Push commits to remote repository.
+
+        Args:
+            project_id: Project UUID
+            user_id: User performing push
+            branch: Optional branch to push (default: current)
+            remote: Remote name (default: origin)
+            force: Whether to force push
+
+        Returns:
+            Push statistics
+
+        Raises:
+            GitCommitPermissionError: If user lacks permissions
+            GitCommitOperationError: If push fails
+        """
+        # Check permissions (must be at least member)
+        if not await self.project_service.check_permission(
+            project_id=project_id,
+            user_id=user_id,
+            required_role="member",
+        ):
+            raise GitCommitPermissionError("Must be at least a project member to push commits")
+
+        try:
+            # Push to remote
+            self.git_service.push(remote=remote, branch=branch, force=force)
+
+            # Update pushed_at timestamps for commits
+            if branch:
+                commits = await self.repository.list_by_project(
+                    project_id=project_id,
+                    branch=branch,
+                    skip=0,
+                    limit=100,
+                )
+                for commit in commits:
+                    await self.repository.update(
+                        commit_id=commit.id,
+                        update_data={"pushed_at": datetime.now()},
+                    )
+
+            return {
+                "success": True,
+                "branch": branch or self.git_service.get_current_branch(),
+                "remote": remote,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to push commits for project {project_id}: {e}")
+            raise GitCommitOperationError(f"Failed to push commits: {e}")
+
+    async def pull_commits(
+        self,
+        project_id: UUID,
+        user_id: UUID,
+        branch: Optional[str] = None,
+        remote: str = "origin",
+    ) -> int:
+        """
+        Pull commits from remote repository.
+
+        Args:
+            project_id: Project UUID
+            user_id: User performing pull
+            branch: Optional branch to pull (default: current)
+            remote: Remote name (default: origin)
+
+        Returns:
+            Count of new commits pulled
+
+        Raises:
+            GitCommitPermissionError: If user lacks permissions
+            GitCommitOperationError: If pull fails
+        """
+        # Check permissions (must be at least member)
+        if not await self.project_service.check_permission(
+            project_id=project_id,
+            user_id=user_id,
+            required_role="member",
+        ):
+            raise GitCommitPermissionError("Must be at least a project member to pull commits")
+
+        try:
+            # Pull from remote
+            self.git_service.pull(remote=remote, branch=branch)
+
+            # Sync new commits to database
+            sync_result = await self.sync_commits_from_git(
+                project_id=project_id,
+                user_id=user_id,
+                branch=branch,
+            )
+
+            return sync_result["new_commits"]
+
+        except Exception as e:
+            logger.error(f"Failed to pull commits for project {project_id}: {e}")
+            raise GitCommitOperationError(f"Failed to pull commits: {e}")
+
+    async def revert_commit(
+        self,
+        commit_id: UUID,
+        user_id: UUID,
+    ) -> GitCommit:
+        """
+        Create a revert commit that undoes changes from specified commit.
+
+        Args:
+            commit_id: Commit UUID to revert
+            user_id: User creating revert
+
+        Returns:
+            Created revert GitCommit object
+
+        Raises:
+            GitCommitNotFoundError: If commit not found
+            GitCommitPermissionError: If user lacks permissions
+            GitCommitOperationError: If revert fails
+        """
+        commit = await self.get_commit(commit_id, user_id)
+
+        # Check permissions (must be at least member)
+        if not await self.project_service.check_permission(
+            project_id=commit.project_id,
+            user_id=user_id,
+            required_role="member",
+        ):
+            raise GitCommitPermissionError("Must be at least a project member to revert commits")
+
+        try:
+            # Create revert commit in git
+            self.git_service.repo.git.revert(commit.sha, "--no-edit")
+
+            # Get the revert commit
+            revert_commit_obj = self.git_service.repo.head.commit
+
+            # Create database record for revert commit
+            revert_message = (
+                f'Revert "{commit.message[:50]}..."\n\nThis reverts commit {commit.sha}.'
+            )
+
+            commit_data = {
+                "project_id": commit.project_id,
+                "sha": revert_commit_obj.hexsha,
+                "message": revert_message,
+                "author_name": revert_commit_obj.author.name,
+                "author_email": revert_commit_obj.author.email,
+                "branch": self.git_service.get_current_branch(),
+                "committed_at": datetime.fromtimestamp(revert_commit_obj.committed_date),
+                "is_merge": False,
+                "files_changed": revert_commit_obj.stats.total["files"],
+                "insertions": revert_commit_obj.stats.total["insertions"],
+                "deletions": revert_commit_obj.stats.total["deletions"],
+                "ardha_user_id": user_id,
+            }
+
+            revert_commit_record = GitCommit(**commit_data)
+            created_revert = await self.repository.create(revert_commit_record)
+
+            logger.info(f"Created revert commit for {commit.sha}")
+            return created_revert
+
+        except Exception as e:
+            logger.error(f"Failed to revert commit {commit_id}: {e}")
+            raise GitCommitOperationError(f"Failed to revert commit: {e}")
+
     # ============= Helper Methods =============
 
     async def _validate_commit_message(self, message: str) -> None:

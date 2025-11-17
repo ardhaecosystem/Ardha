@@ -174,7 +174,7 @@ async def test_rename_file(client: AsyncClient, test_user: dict) -> None:
     )
     assert response.status_code == 201
     project_id = response.json()["id"]
-
+    
     response = await client.post(
         "/api/v1/files",
         headers={"Authorization": f"Bearer {test_user['token']}"},
@@ -185,8 +185,17 @@ async def test_rename_file(client: AsyncClient, test_user: dict) -> None:
         },
     )
     assert response.status_code == 201
-    file_id = response.json()["id"]
-
+    file_data = response.json()
+    file_id = file_data["id"]
+    
+    # Verify file exists before rename
+    response = await client.get(
+        f"/api/v1/files/{file_id}",
+        headers={"Authorization": f"Bearer {test_user['token']}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["path"] == "old_name.txt"
+    
     # Rename file
     response = await client.patch(
         f"/api/v1/files/{file_id}/rename",
@@ -196,9 +205,20 @@ async def test_rename_file(client: AsyncClient, test_user: dict) -> None:
             "commit": False,
         },
     )
+    if response.status_code != 200:
+        print(f"Rename failed with status {response.status_code}: {response.text}")
+        print(f"File ID was: {file_id}")
     assert response.status_code == 200
-    file_data = response.json()
-    assert file_data["path"] == "new_name.txt"
+    renamed_data = response.json()
+    assert renamed_data["path"] == "new_name.txt"
+    
+    # Verify file can be accessed with new path
+    response = await client.get(
+        f"/api/v1/files/{file_id}",
+        headers={"Authorization": f"Bearer {test_user['token']}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["path"] == "new_name.txt"
 
 
 @pytest.mark.asyncio
@@ -212,7 +232,7 @@ async def test_delete_file(client: AsyncClient, test_user: dict) -> None:
     )
     assert response.status_code == 201
     project_id = response.json()["id"]
-
+    
     response = await client.post(
         "/api/v1/files",
         headers={"Authorization": f"Bearer {test_user['token']}"},
@@ -223,17 +243,36 @@ async def test_delete_file(client: AsyncClient, test_user: dict) -> None:
         },
     )
     assert response.status_code == 201
-    file_id = response.json()["id"]
-
+    file_data = response.json()
+    file_id = file_data["id"]
+    
+    # Verify file exists before deletion
+    response = await client.get(
+        f"/api/v1/files/{file_id}",
+        headers={"Authorization": f"Bearer {test_user['token']}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["path"] == "temp.txt"
+    
     # Delete file
     response = await client.delete(
         f"/api/v1/files/{file_id}",
         headers={"Authorization": f"Bearer {test_user['token']}"},
         params={"commit": False},
     )
+    if response.status_code != 200:
+        print(f"Delete failed with status {response.status_code}: {response.text}")
+        print(f"File ID was: {file_id}")
     assert response.status_code == 200
     result = response.json()
     assert result["success"] is True
+    
+    # Verify file is deleted (should return 404)
+    response = await client.get(
+        f"/api/v1/files/{file_id}",
+        headers={"Authorization": f"Bearer {test_user['token']}"},
+    )
+    assert response.status_code == 404
 
 
 @pytest.mark.asyncio

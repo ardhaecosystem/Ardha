@@ -69,8 +69,12 @@ async def create_file(
 
         settings = get_settings()
 
-        import tempfile
-        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
+        # Use project root from config for consistent file operations
+        project_root = Path(settings.files.project_root)
+        # Create project directory if it doesn't exist
+        project_root.mkdir(parents=True, exist_ok=True)
+
+        service = FileService(db, project_root)
         file = await service.create_file(
             project_id=file_data.project_id,
             file_path=file_data.path,
@@ -125,8 +129,12 @@ async def get_file(
 
         settings = get_settings()
 
-        import tempfile
-        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
+        # Use project root from config for consistent file operations
+        project_root = Path(settings.files.project_root)
+        # Create project directory if it doesn't exist
+        project_root.mkdir(parents=True, exist_ok=True)
+
+        service = FileService(db, project_root)
         file = await service.get_file(file_id, current_user.id)
 
         return FileResponse.model_validate(file)
@@ -177,8 +185,12 @@ async def get_file_content(
 
         settings = get_settings()
 
-        import tempfile
-        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
+        # Use project root from config for consistent file operations
+        project_root = Path(settings.files.project_root)
+        # Create project directory if it doesn't exist
+        project_root.mkdir(parents=True, exist_ok=True)
+
+        service = FileService(db, project_root)
         file = await service.get_file(file_id, current_user.id)
         content = await service.get_file_content(file_id, current_user.id, ref)
 
@@ -235,8 +247,12 @@ async def update_file_content(
 
         settings = get_settings()
 
-        import tempfile
-        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
+        # Use project root from config for consistent file operations
+        project_root = Path(settings.files.project_root)
+        # Create project directory if it doesn't exist
+        project_root.mkdir(parents=True, exist_ok=True)
+
+        service = FileService(db, project_root)
         file = await service.update_file_content(
             file_id=file_id,
             content=update_data.content,
@@ -300,8 +316,12 @@ async def rename_file(
 
         settings = get_settings()
 
-        import tempfile
-        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
+        # Use project root from config for consistent file operations
+        project_root = Path(settings.files.project_root)
+        # Create project directory if it doesn't exist
+        project_root.mkdir(parents=True, exist_ok=True)
+
+        service = FileService(db, project_root)
         file = await service.rename_file(
             file_id=file_id,
             new_path=rename_data.new_path,
@@ -367,8 +387,12 @@ async def delete_file(
 
         settings = get_settings()
 
-        import tempfile
-        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
+        # Use project root from config for consistent file operations
+        project_root = Path(settings.files.project_root)
+        # Create project directory if it doesn't exist
+        project_root.mkdir(parents=True, exist_ok=True)
+
+        service = FileService(db, project_root)
         success = await service.delete_file(
             file_id=file_id,
             user_id=current_user.id,
@@ -438,8 +462,12 @@ async def list_project_files(
 
         settings = get_settings()
 
-        import tempfile
-        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
+        # Use project root from config for consistent file operations
+        project_root = Path(settings.files.project_root)
+        # Create project directory if it doesn't exist
+        project_root.mkdir(parents=True, exist_ok=True)
+
+        service = FileService(db, project_root)
 
         # Convert file_type string to enum if provided
         file_type_enum = None
@@ -512,8 +540,11 @@ async def get_file_history(
     try:
         from ardha.core.config import get_settings
 
-        import tempfile
-        service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
+        settings = get_settings()
+        project_root = Path(settings.files.project_root)
+        project_root.mkdir(parents=True, exist_ok=True)
+
+        service = FileService(db, project_root)
         file, commits = await service.get_file_history(
             file_id=file_id,
             user_id=current_user.id,

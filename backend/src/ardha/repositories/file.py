@@ -92,7 +92,7 @@ class FileRepository:
         try:
             stmt = (
                 select(File)
-                .where(File.id == file_id)
+                .where(and_(File.id == file_id, File.is_deleted == False))
                 .options(
                     selectinload(File.project),
                     selectinload(File.last_modified_by),

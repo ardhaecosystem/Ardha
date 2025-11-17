@@ -66,8 +66,9 @@ async def create_commit(
     try:
         from ardha.core.config import get_settings
 
-        import tempfile
-        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
         commit = await service.create_commit(
             project_id=commit_data.project_id,
             message=commit_data.message,
@@ -120,8 +121,9 @@ async def get_commit(
     try:
         from ardha.core.config import get_settings
 
-        import tempfile
-        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
         commit = await service.get_commit(commit_id, current_user.id)
 
         return GitCommitResponse.model_validate(commit)
@@ -182,8 +184,9 @@ async def list_commits(
     try:
         from ardha.core.config import get_settings
 
-        import tempfile
-        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
         commits, total = await service.list_commits(
             project_id=project_id,
             user_id=current_user.id,
@@ -244,8 +247,9 @@ async def link_commit_to_tasks(
     try:
         from ardha.core.config import get_settings
 
-        import tempfile
-        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
         commit = await service.link_commit_to_tasks(
             commit_id=commit_id,
             user_id=current_user.id,
@@ -295,8 +299,9 @@ async def get_commit_with_files(
     try:
         from ardha.core.config import get_settings
 
-        import tempfile
-        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
         commit, file_changes = await service.get_commit_with_files(commit_id, current_user.id)
 
         return GitCommitWithFilesResponse(
@@ -361,8 +366,9 @@ async def get_file_commits(
     try:
         from ardha.core.config import get_settings
 
-        import tempfile
-        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
         commits = await service.get_file_commits(file_id, current_user.id, max_count)
 
         return [GitCommitResponse.model_validate(c) for c in commits]
@@ -410,8 +416,9 @@ async def get_user_commits(
     try:
         from ardha.core.config import get_settings
 
-        import tempfile
-        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
         commits = await service.get_user_commits(
             user_id=user_id,
             requesting_user_id=requesting_user.id,
@@ -461,8 +468,9 @@ async def get_latest_commit(
     try:
         from ardha.core.config import get_settings
 
-        import tempfile
-        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
         commit = await service.get_latest_commit(project_id, current_user.id, branch)
 
         if not commit:
@@ -512,8 +520,9 @@ async def sync_commits(
     try:
         from ardha.core.config import get_settings
 
-        import tempfile
-        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
         stats = await service.sync_commits_from_git(
             project_id=project_id,
             user_id=current_user.id,
@@ -567,8 +576,9 @@ async def get_commit_stats(
     try:
         from ardha.core.config import get_settings
 
-        import tempfile
-        service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
         stats = await service.get_commit_stats(project_id, current_user.id, branch)
 
         return GitCommitStatsResponse(
@@ -627,8 +637,8 @@ async def get_project_branches(
             )
 
         # Get branches from git service
-        import tempfile
-        git_service = GitCommitService(db, tempfile.mkdtemp(prefix="ardha-"))
+        project_root = settings.files.project_root
+        git_service = GitCommitService(db, project_root)
         commits, _ = await git_service.list_commits(
             project_id=project_id,
             user_id=current_user.id,
@@ -649,4 +659,313 @@ async def get_project_branches(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get project branches",
+        )
+
+
+@router.get(
+    "/projects/{project_id}/status",
+    summary="Get git repository status",
+    description="Get git repository status including untracked, modified, and staged files.",
+)
+async def get_git_status(
+    project_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Get git repository status.
+
+    User must be a project member to view repository status.
+
+    Returns status with file lists and counts.
+    """
+    try:
+        from ardha.core.config import get_settings
+        from ardha.services.project_service import ProjectService
+
+        settings = get_settings()
+
+        # Check project permissions
+        project_service = ProjectService(db)
+        if not await project_service.check_permission(project_id, current_user.id, "viewer"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Must be a project member to view repository status",
+            )
+
+        # Get status from git service
+        project_root = settings.files.project_root
+        git_service = GitCommitService(db, project_root)
+        status_info = git_service.git_service.get_status()
+
+        return status_info
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting git status for project {project_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get git status",
+        )
+
+
+@router.get(
+    "/commits/{commit_id}/diff",
+    summary="Get commit diff",
+    description="Get unified diff for a commit. User must be a project member.",
+)
+async def get_commit_diff(
+    commit_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Get unified diff for a commit.
+
+    User must be a project member to view commit diff.
+
+    Returns unified diff string.
+    """
+    try:
+        from ardha.core.config import get_settings
+
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
+        diff = await service.get_commit_diff(commit_id, current_user.id)
+
+        return {"diff": diff}
+
+    except GitCommitNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except GitCommitPermissionError as e:
+        logger.warning(f"Permission denied accessing commit diff: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error getting diff for commit {commit_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get commit diff",
+        )
+
+
+@router.post(
+    "/projects/{project_id}/push",
+    summary="Push commits to remote",
+    description="Push commits to remote repository. Requires member role.",
+)
+async def push_commits(
+    project_id: UUID,
+    branch: str = Query(None, description="Branch to push (default: current)"),
+    remote: str = Query("origin", description="Remote name"),
+    force: bool = Query(False, description="Force push"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Push commits to remote repository.
+
+    Query parameters:
+    - **branch**: Branch to push (default: current branch)
+    - **remote**: Remote name (default: origin)
+    - **force**: Whether to force push (default: false)
+
+    Requires at least project member role.
+
+    Returns push result with branch and remote info.
+    """
+    try:
+        from ardha.core.config import get_settings
+
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
+        result = await service.push_commits(
+            project_id=project_id,
+            user_id=current_user.id,
+            branch=branch,
+            remote=remote,
+            force=force,
+        )
+
+        return result
+
+    except GitCommitPermissionError as e:
+        logger.warning(f"Permission denied pushing commits: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error pushing commits for project {project_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to push commits",
+        )
+
+
+@router.post(
+    "/projects/{project_id}/pull",
+    summary="Pull commits from remote",
+    description="Pull commits from remote repository. Requires member role.",
+)
+async def pull_commits(
+    project_id: UUID,
+    branch: str = Query(None, description="Branch to pull (default: current)"),
+    remote: str = Query("origin", description="Remote name"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Pull commits from remote repository.
+
+    Query parameters:
+    - **branch**: Branch to pull (default: current branch)
+    - **remote**: Remote name (default: origin)
+
+    Requires at least project member role.
+
+    Returns count of new commits pulled.
+    """
+    try:
+        from ardha.core.config import get_settings
+
+        settings = get_settings()
+        project_root = settings.files.project_root
+        service = GitCommitService(db, project_root)
+        new_commits = await service.pull_commits(
+            project_id=project_id,
+            user_id=current_user.id,
+            branch=branch,
+            remote=remote,
+        )
+
+        return {"success": True, "new_commits": new_commits}
+
+    except GitCommitPermissionError as e:
+        logger.warning(f"Permission denied pulling commits: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error pulling commits for project {project_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to pull commits",
+        )
+
+
+@router.post(
+    "/projects/{project_id}/branches",
+    summary="Create git branch",
+    description="Create a new git branch. Requires member role.",
+)
+async def create_branch(
+    project_id: UUID,
+    branch_name: str = Query(..., description="Name of new branch"),
+    start_point: str = Query(None, description="Start point (commit/branch)"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Create a new git branch.
+
+    Query parameters:
+    - **branch_name**: Name of new branch (required)
+    - **start_point**: Optional start point (commit SHA or branch name)
+
+    Requires at least project member role.
+
+    Returns created branch name.
+    """
+    try:
+        from ardha.core.config import get_settings
+        from ardha.services.project_service import ProjectService
+
+        settings = get_settings()
+
+        # Check project permissions
+        project_service = ProjectService(db)
+        if not await project_service.check_permission(project_id, current_user.id, "member"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Must be at least a project member to create branches",
+            )
+
+        # Create branch using git service
+        project_root = settings.files.project_root
+        git_commit_service = GitCommitService(db, project_root)
+        git_commit_service.git_service.create_branch(branch_name, start_point)
+
+        return {"branch": branch_name, "created": True}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating branch for project {project_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create branch: {str(e)}",
+        )
+
+
+@router.post(
+    "/projects/{project_id}/checkout",
+    summary="Switch git branch",
+    description="Switch to a different git branch. Requires member role.",
+)
+async def checkout_branch(
+    project_id: UUID,
+    branch_name: str = Query(..., description="Branch to switch to"),
+    create: bool = Query(False, description="Create branch if doesn't exist"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Switch to a different git branch.
+
+    Query parameters:
+    - **branch_name**: Branch to switch to (required)
+    - **create**: Create branch if it doesn't exist (default: false)
+
+    Requires at least project member role.
+
+    Returns switched branch name.
+    """
+    try:
+        from ardha.core.config import get_settings
+        from ardha.services.project_service import ProjectService
+
+        settings = get_settings()
+
+        # Check project permissions
+        project_service = ProjectService(db)
+        if not await project_service.check_permission(project_id, current_user.id, "member"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Must be at least a project member to switch branches",
+            )
+
+        # Switch branch using git service
+        project_root = settings.files.project_root
+        git_commit_service = GitCommitService(db, project_root)
+        git_commit_service.git_service.switch_branch(branch_name, create)
+
+        return {"branch": branch_name, "switched": True}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error switching branch for project {project_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to switch branch: {str(e)}",
         )

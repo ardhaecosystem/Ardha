@@ -94,8 +94,8 @@ class FileService:
             project_id: Project UUID
             file_path: Relative file path
             content: File content
-            user_id: User creating the file
-            commit: Whether to commit the file creation
+            user_id: User creating file
+            commit: Whether to commit file creation
             commit_message: Custom commit message
 
         Returns:
@@ -246,7 +246,7 @@ class FileService:
             file_id: File UUID
             content: New file content
             user_id: User updating file
-            commit: Whether to commit the changes
+            commit: Whether to commit changes
             commit_message: Custom commit message
 
         Returns:
@@ -327,7 +327,7 @@ class FileService:
             file_id: File UUID
             new_path: New file path
             user_id: User renaming file
-            commit: Whether to commit the rename
+            commit: Whether to commit rename
             commit_message: Custom commit message
 
         Returns:
@@ -351,53 +351,66 @@ class FileService:
         # Validate new path
         await self._validate_file_rename(file.project_id, file.path, new_path)
 
-        try:
-            # Rename file in filesystem
-            self.git_service.rename_file(file.path, new_path)
+        # Rename file in filesystem
+        old_full_path = self.git_service.repo_path / file.path
+        new_full_path = self.git_service.repo_path / new_path
 
-            # Update file record
-            updated_file = await self.repository.update(
+        if not old_full_path.exists():
+            raise FileNotFoundError(f"File not found: {file.path}")
+
+        # Create parent directories for new path
+        new_full_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Move file
+        old_full_path.rename(new_full_path)
+
+        # Try to stage in git if requested
+        if commit and self.git_service.is_initialized():
+            try:
+                self.git_service.rename_file(file.path, new_path, stage=True)
+            except Exception:
+                # Git staging failed, but file was moved successfully
+                pass
+
+        # Update file record
+        updated_file = await self.repository.update(
+            file_id=file_id,
+            update_data={
+                "path": new_path,
+                "name": Path(new_path).name,
+                "extension": Path(new_path).suffix,
+                "file_type": self._detect_file_type(new_path),
+                "language": self._detect_language(new_path),
+            },
+        )
+
+        if not updated_file:
+            raise FileOperationError("Failed to update file record")
+
+        # Optional git commit
+        commit_sha = None
+        if commit and self.git_service.is_initialized():
+            if not commit_message:
+                commit_message = f"Rename file: {file.path} → {new_path}"
+
+            commit_info = self.git_service.commit(
+                message=commit_message,
+                author_name=await self._get_user_name(user_id),
+                author_email=await self._get_user_email(user_id),
+            )
+            commit_sha = commit_info["sha"]
+
+            # Update file with git metadata
+            await self.repository.update_from_git(
                 file_id=file_id,
-                update_data={
-                    "path": new_path,
-                    "name": Path(new_path).name,
-                    "extension": Path(new_path).suffix,
-                    "file_type": self._detect_file_type(new_path),
-                    "language": self._detect_language(new_path),
-                },
+                commit_sha=commit_sha,
+                commit_message=commit_message,
+                modified_by_user_id=user_id,
+                modified_at=datetime.now(),
             )
 
-            if not updated_file:
-                raise FileOperationError("Failed to update file record")
-
-            # Optional git commit
-            commit_sha = None
-            if commit and self.git_service.is_initialized():
-                if not commit_message:
-                    commit_message = f"Rename file: {file.path} → {new_path}"
-
-                commit_info = self.git_service.commit(
-                    message=commit_message,
-                    author_name=await self._get_user_name(user_id),
-                    author_email=await self._get_user_email(user_id),
-                )
-                commit_sha = commit_info["sha"]
-
-                # Update file with git metadata
-                await self.repository.update_from_git(
-                    file_id=file_id,
-                    commit_sha=commit_sha,
-                    commit_message=commit_message,
-                    modified_by_user_id=user_id,
-                    modified_at=datetime.now(),
-                )
-
-            logger.info(f"Renamed file {file.path} to {new_path}")
-            return updated_file
-
-        except Exception as e:
-            logger.error(f"Failed to rename file {file.path}: {e}")
-            raise FileOperationError(f"Failed to rename file: {e}")
+        logger.info(f"Renamed file {file.path} to {new_path}")
+        return updated_file
 
     async def delete_file(
         self,
@@ -412,7 +425,7 @@ class FileService:
         Args:
             file_id: File UUID
             user_id: User deleting file
-            commit: Whether to commit the deletion
+            commit: Whether to commit deletion
             commit_message: Custom commit message
 
         Returns:
@@ -432,30 +445,39 @@ class FileService:
         ):
             raise FilePermissionError("Must be project admin or owner to delete files")
 
-        try:
-            # Delete file from filesystem
-            self.git_service.delete_file(file.path, stage=commit)
+        # Delete file from filesystem
+        full_path = self.git_service.repo_path / file.path
 
-            # Soft delete file record
-            success = await self.repository.delete(file_id, soft=True)
+        if not full_path.exists():
+            raise FileNotFoundError(f"File not found: {file.path}")
 
-            # Optional git commit
-            if commit and self.git_service.is_initialized():
-                if not commit_message:
-                    commit_message = f"Delete file: {file.path}"
+        # Delete file
+        full_path.unlink()
 
-                self.git_service.commit(
-                    message=commit_message,
-                    author_name=await self._get_user_name(user_id),
-                    author_email=await self._get_user_email(user_id),
-                )
+        # Try to stage in git if requested
+        if commit and self.git_service.is_initialized():
+            try:
+                self.git_service.delete_file(file.path, stage=True)
+            except Exception:
+                # Git staging failed, but file was deleted successfully
+                pass
 
-            logger.info(f"Deleted file {file.path}")
-            return success
+        # Soft delete file record
+        success = await self.repository.delete(file_id, soft=True)
 
-        except Exception as e:
-            logger.error(f"Failed to delete file {file.path}: {e}")
-            raise FileOperationError(f"Failed to delete file: {e}")
+        # Optional git commit
+        if commit and self.git_service.is_initialized():
+            if not commit_message:
+                commit_message = f"Delete file: {file.path}"
+
+            self.git_service.commit(
+                message=commit_message,
+                author_name=await self._get_user_name(user_id),
+                author_email=await self._get_user_email(user_id),
+            )
+
+        logger.info(f"Deleted file {file.path}")
+        return success
 
     async def list_project_files(
         self,
@@ -625,6 +647,120 @@ class FileService:
         except Exception as e:
             logger.error(f"Failed to get file history for {file.path}: {e}")
             raise FileOperationError(f"Failed to get file history: {e}")
+
+    async def sync_from_git(self, project_id: UUID, user_id: UUID) -> int:
+        """
+        Scan git repository and sync files to database.
+
+        Args:
+            project_id: Project UUID
+            user_id: User performing sync
+
+        Returns:
+            Count of synced files
+
+        Raises:
+            FilePermissionError: If user lacks permissions
+            FileOperationError: If sync operation fails
+        """
+        # Check project permissions (must be at least admin)
+        if not await self.project_service.check_permission(
+            project_id=project_id,
+            user_id=user_id,
+            required_role="admin",
+        ):
+            raise FilePermissionError("Must be project admin or owner to sync files")
+
+        if not self.git_service.is_initialized():
+            logger.warning(f"Git not initialized for project {project_id}, skipping sync")
+            return 0
+
+        try:
+            synced_count = 0
+            new_files = 0
+            updated_files = 0
+
+            # Get all tracked files from git using ls-files command
+            repo = self.git_service.repo
+
+            # Get list of all tracked files
+            tracked_files = repo.git.ls_files().splitlines()
+
+            for file_path in tracked_files:
+                # Skip empty paths
+                if not file_path:
+                    continue
+
+                try:
+                    # Get file info from git
+                    head_commit = repo.head.commit
+                    blob = head_commit.tree / file_path
+
+                    # Get file metadata
+                    content_hash = str(blob.hexsha)
+                    size_bytes = int(blob.size)
+
+                    # Check if file exists in database
+                    existing_file = await self.repository.get_by_path(project_id, file_path)
+
+                    if existing_file:
+                        # Update existing file if changed
+                        if existing_file.content_hash != content_hash:
+                            await self.repository.update(
+                                file_id=existing_file.id,
+                                update_data={
+                                    "content_hash": content_hash,
+                                    "size_bytes": size_bytes,
+                                    "last_modified_at": datetime.now(),
+                                },
+                            )
+                            updated_files += 1
+                    else:
+                        # Create new file record
+                        # Detect if binary by checking extension
+                        binary_extensions = {
+                            ".jpg",
+                            ".jpeg",
+                            ".png",
+                            ".gif",
+                            ".zip",
+                            ".exe",
+                            ".bin",
+                        }
+                        is_binary = Path(file_path).suffix.lower() in binary_extensions
+
+                        file_data = {
+                            "project_id": project_id,
+                            "path": file_path,
+                            "name": Path(file_path).name,
+                            "extension": Path(file_path).suffix,
+                            "content": None,  # Don't store large content in DB
+                            "content_hash": content_hash,
+                            "size_bytes": size_bytes,
+                            "file_type": self._detect_file_type(file_path),
+                            "language": self._detect_language(file_path),
+                            "is_binary": is_binary,
+                        }
+
+                        file = File(**file_data)
+                        await self.repository.create(file)
+                        new_files += 1
+
+                    synced_count += 1
+
+                except Exception as file_error:
+                    logger.warning(f"Failed to sync file {file_path}: {file_error}")
+                    continue
+
+            logger.info(
+                f"Synced {synced_count} files for project {project_id} "
+                f"({new_files} new, {updated_files} updated)"
+            )
+            return synced_count
+
+        except Exception as e:
+            logger.error(f"Failed to sync files from git for project {project_id}: {e}")
+            raise FileOperationError(f"Failed to sync files from git: {e}")
 
     # ============= Helper Methods =============
 

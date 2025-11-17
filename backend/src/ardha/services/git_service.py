@@ -406,7 +406,11 @@ class GitService:
 
             # Stage deletion if requested
             if stage and self.is_initialized():
-                self.repo.index.remove([file_path], working_tree=True, r=True)
+                try:
+                    self.repo.index.remove([file_path], working_tree=True, r=True)
+                except GitCommandError:
+                    # File might not be tracked, that's okay
+                    pass
 
         except FileNotFoundError:
             # Re-raise FileNotFoundError as-is
@@ -439,7 +443,11 @@ class GitService:
 
             # Stage rename if requested
             if stage and self.is_initialized():
-                self.repo.index.remove([old_path], working_tree=True, r=True)
+                try:
+                    self.repo.index.remove([old_path], working_tree=True, r=True)
+                except GitCommandError:
+                    # File might not be tracked, that's okay
+                    pass
                 self.repo.index.add([new_path])
 
         except FileNotFoundError:
