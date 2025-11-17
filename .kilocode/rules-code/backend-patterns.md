@@ -689,6 +689,303 @@ poetry run ruff check .
 
 ---
 
+## 💻 Development Workflow & Coding Standards
+
+### **Poetry Dependency Management**
+
+**Adding Dependencies:**
+```bash
+cd backend
+
+# Add production dependency
+poetry add package-name
+
+# Add dev dependency
+poetry add --group dev package-name
+
+# Install all dependencies
+poetry install
+
+# Update lock file
+poetry update
+```
+
+**Key Rules:**
+- ✅ ALWAYS use `poetry add` (never edit pyproject.toml manually)
+- ✅ Lock ALL dependencies with exact versions
+- ✅ Use `--group dev` for development-only packages
+- ✅ Test after adding dependencies (`poetry run pytest`)
+- ❌ NEVER commit with unlocked dependencies
+- ❌ NEVER use `pip install` (breaks Poetry lock)
+
+---
+
+### **Git Commit Standards**
+
+**Conventional Commits Format:**
+```bash
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation only
+- `style`: Code formatting (no logic change)
+- `refactor`: Code restructuring (no behavior change)
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks
+
+**Examples:**
+```bash
+# ✅ GOOD commits
+git commit -m "feat(auth): add GitHub OAuth login"
+git commit -m "fix(tasks): prevent duplicate task identifiers"
+git commit -m "refactor(files): extract file validation to helper method"
+
+# ❌ BAD commits
+git commit -m "Update files"          # Too vague
+git commit -m "WIP"                   # Work in progress
+git commit -m "Fixed bug"             # What bug?
+```
+
+**Pre-Commit Hooks:**
+Ardha uses automated pre-commit hooks (`.pre-commit-config.yaml`):
+- **black**: Auto-formats code
+- **isort**: Sorts imports
+- **flake8**: Linting (PEP 8 compliance)
+- **mypy**: Type checking
+- **bandit**: Security checks
+
+**If hooks fail:**
+```bash
+# View what failed
+git commit -m "your message"  # Hooks run automatically
+
+# Fix issues manually
+poetry run black .
+poetry run isort .
+poetry run flake8 .
+
+# Or bypass (ONLY if hooks have false positives)
+git commit --no-verify -m "your message"
+```
+
+---
+
+### **Flake8 Coding Standards**
+
+**Configuration** (`.flake8`):
+```ini
+[flake8]
+max-line-length = 100
+max-complexity = 10
+exclude = .git,__pycache__,.venv,build,dist,*.egg-info,alembic/versions
+ignore = W503,E203
+per-file-ignores = __init__.py:F401
+```
+
+**Common Flake8 Errors & Fixes:**
+
+**E712: Comparison to False (SQLAlchemy-specific)**
+```python
+# ❌ WRONG
+stmt = select(File).where(File.is_deleted == False)
+
+# ✅ CORRECT (use .is_() for SQLAlchemy)
+stmt = select(File).where(File.is_deleted.is_(False))
+```
+
+**F401: Unused Import**
+```python
+# ❌ WRONG
+from ardha.core.config import get_settings
+import tempfile  # Imported but never used
+
+# ✅ CORRECT (remove unused imports)
+from ardha.core.config import get_settings
+```
+
+**E501: Line Too Long**
+```python
+# ❌ WRONG (>100 characters)
+user = await self.repository.create_user_with_profile_and_settings(email="test@example.com", full_name="Test User")
+
+# ✅ CORRECT (split long lines)
+user = await self.repository.create_user_with_profile_and_settings(
+    email="test@example.com",
+    full_name="Test User"
+)
+```
+
+**W293: Blank Line Contains Whitespace**
+```python
+# ❌ WRONG (spaces on blank line)
+def method1():
+    pass
+
+def method2():  # <-- blank line above has spaces
+
+# ✅ CORRECT (Black auto-fixes this)
+poetry run black .
+```
+
+---
+
+### **SQLAlchemy Best Practices**
+
+**Boolean Comparisons:**
+```python
+# ❌ WRONG
+.where(Model.is_active == True)
+.where(Model.is_deleted == False)
+
+# ✅ CORRECT
+.where(Model.is_active.is_(True))
+.where(Model.is_deleted.is_(False))
+
+# ✅ EVEN BETTER (for False checks)
+.where(~Model.is_deleted)  # Negation operator
+```
+
+**Avoid N+1 Queries:**
+```python
+# ❌ WRONG (N+1 query problem)
+async def get_project_with_tasks(project_id):
+    project = await self.get_by_id(project_id)
+    for task in project.tasks:  # Triggers N queries!
+        print(task.name)
+
+# ✅ CORRECT (eager loading)
+from sqlalchemy.orm import selectinload
+
+async def get_project_with_tasks(project_id):
+    stmt = (
+        select(Project)
+        .options(selectinload(Project.tasks))
+        .where(Project.id == project_id)
+    )
+    result = await self.db.execute(stmt)
+    return result.scalar_one_or_none()
+```
+
+---
+
+### **Common Mistakes to Avoid**
+
+**1. Tempfile Memory Leaks:**
+```python
+# ❌ WRONG (creates orphaned temp directories)
+import tempfile
+service = FileService(db, Path(tempfile.mkdtemp(prefix="ardha-")))
+
+# ✅ CORRECT (use project root from config)
+from ardha.core.config import get_settings
+settings = get_settings()
+project_root = Path(settings.files.project_root)
+service = FileService(db, project_root)
+```
+
+**2. Test Mocks in Production Code:**
+```python
+# ❌ WRONG (test code in production service)
+class MyService:
+    def production_method(self):
+        pass
+
+class MockMyService:  # DON'T PUT THIS HERE!
+    def mock_method(self):
+        pass
+
+# ✅ CORRECT (mocks in tests/fixtures/)
+# File: tests/fixtures/my_fixtures.py
+class MockMyService:
+    def mock_method(self):
+        pass
+```
+
+**3. Missing Type Hints:**
+```python
+# ❌ WRONG
+async def get_user(user_id):
+    return await self.repository.get_by_id(user_id)
+
+# ✅ CORRECT
+async def get_user(self, user_id: UUID) -> Optional[User]:
+    return await self.repository.get_by_id(user_id)
+```
+
+**4. Hardcoded Configuration:**
+```python
+# ❌ WRONG
+DATABASE_URL = "postgresql://user:pass@localhost/db"
+
+# ✅ CORRECT
+from ardha.core.config import get_settings
+settings = get_settings()
+database_url = settings.database.url  # From environment
+```
+
+---
+
+### **Code Review Checklist**
+
+Before committing, verify:
+
+- [ ] All functions have type hints
+- [ ] All async I/O operations use `await`
+- [ ] No hardcoded secrets or configuration
+- [ ] Boolean comparisons use `.is_(True/False)` for SQLAlchemy
+- [ ] Imports are used (no F401 errors)
+- [ ] Lines are <100 characters
+- [ ] Tests pass (`poetry run pytest`)
+- [ ] Flake8 clean (`poetry run flake8 .`)
+- [ ] Black formatted (`poetry run black .`)
+- [ ] No test code in production files
+- [ ] No temporary directory creation in request handlers
+
+---
+
+### **When Pre-Commit Hooks Fail**
+
+**Step-by-Step Fix Process:**
+
+1. **Read the error carefully** - Pre-commit shows exactly what's wrong
+2. **Fix the specific files** mentioned in the error
+3. **Re-run the commit** - Hooks run automatically
+
+**Common Scenarios:**
+
+**Black/isort failures:**
+```bash
+# Hooks already fixed files, just add and retry
+git add -u
+git commit -m "your message"  # Will pass now
+```
+
+**Flake8 failures:**
+```bash
+# Fix the specific errors shown
+# Example: Remove unused import from line 42
+vim src/ardha/services/my_service.py  # Remove import
+
+# Then commit again
+git commit -m "your message"
+```
+
+**Mypy failures in unrelated files:**
+```bash
+# If errors are in files YOU didn't modify, use --no-verify
+# (These are pre-existing issues to fix later)
+git commit --no-verify -m "feat: your changes"
+```
+
+---
+
 ## 🌟 Open-Source Best Practices
 
 These patterns demonstrate:
@@ -703,7 +1000,7 @@ These patterns demonstrate:
 
 ---
 
-**Version**: 1.0
-**Last Updated**: November 5, 2025
+**Version**: 1.1
+**Last Updated**: November 17, 2025
 **Maintained By**: Ardha Development Team
 **License**: MIT (Open Source)
