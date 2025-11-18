@@ -19,7 +19,6 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
-    Enum,
     ForeignKey,
     Index,
     Integer,
@@ -427,7 +426,9 @@ class GitHubIntegration(Base, BaseModel):
             "repository_name": self.repository_name,
             "repository_url": self.repository_url,
             "default_branch": self.default_branch,
-            "token_expires_at": self.token_expires_at.isoformat() if self.token_expires_at else None,
+            "token_expires_at": (
+                self.token_expires_at.isoformat() if self.token_expires_at else None
+            ),
             "installation_id": self.installation_id,
             "auto_create_pr": self.auto_create_pr,
             "auto_link_tasks": self.auto_link_tasks,
@@ -1047,13 +1048,9 @@ class PullRequest(Base, BaseModel):
         if "merged" in pr_data:
             self.merged = pr_data["merged"]
         if "merged_at" in pr_data and pr_data["merged_at"]:
-            self.merged_at = datetime.fromisoformat(
-                pr_data["merged_at"].replace("Z", "+00:00")
-            )
+            self.merged_at = datetime.fromisoformat(pr_data["merged_at"].replace("Z", "+00:00"))
         if "closed_at" in pr_data and pr_data["closed_at"]:
-            self.closed_at = datetime.fromisoformat(
-                pr_data["closed_at"].replace("Z", "+00:00")
-            )
+            self.closed_at = datetime.fromisoformat(pr_data["closed_at"].replace("Z", "+00:00"))
 
         # Change statistics
         if "additions" in pr_data:

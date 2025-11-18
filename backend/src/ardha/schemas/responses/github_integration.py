@@ -100,9 +100,7 @@ class GitHubIntegrationResponse(BaseModel):
 class GitHubIntegrationListResponse(BaseModel):
     """Response model for list of GitHub integrations."""
 
-    integrations: list[GitHubIntegrationResponse] = Field(
-        description="List of GitHub integrations"
-    )
+    integrations: list[GitHubIntegrationResponse] = Field(description="List of GitHub integrations")
     total_count: int = Field(description="Total number of integrations")
 
     model_config = ConfigDict(

@@ -354,7 +354,8 @@ class Task(Base, BaseModel):
             name="ck_task_priority",
         ),
         CheckConstraint(
-            "complexity IS NULL OR complexity IN ('trivial', 'simple', 'medium', 'complex', 'very_complex')",
+            "complexity IS NULL OR complexity IN "
+            "('trivial', 'simple', 'medium', 'complex', 'very_complex')",
             name="ck_task_complexity",
         ),
         CheckConstraint(
@@ -366,8 +367,7 @@ class Task(Base, BaseModel):
             name="ck_task_actual_hours",
         ),
         CheckConstraint(
-            "ai_confidence IS NULL OR (ai_confidence >= 0 AND "
-            "ai_confidence <= 1)",
+            "ai_confidence IS NULL OR (ai_confidence >= 0 AND " "ai_confidence <= 1)",
             name="ck_task_ai_confidence",
         ),
     )
