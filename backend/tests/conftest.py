@@ -430,6 +430,12 @@ def test_client(client: AsyncClient, test_user: dict) -> AsyncClient:
     return client
 
 
+@pytest.fixture
+def auth_headers(test_user: dict):
+    """Create authentication headers from test_user fixture."""
+    return {"Authorization": f"Bearer {test_user['token']}"}
+
+
 # ============= OpenSpec Fixtures =============
 
 

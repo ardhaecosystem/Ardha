@@ -11,6 +11,7 @@ from ardha.api.v1.routes import (
     chats,
     files,
     git,
+    github,
     memories,
     milestones,
     oauth,
@@ -21,6 +22,7 @@ from ardha.api.v1.routes import (
     websocket,
     workflows,
 )
+from ardha.api.v1.webhooks import github as github_webhooks
 from ardha.core.config import settings
 
 
@@ -53,12 +55,16 @@ def create_app() -> FastAPI:
     app.include_router(tasks.router, prefix="/api/v1")
     app.include_router(files.router, prefix="/api/v1")
     app.include_router(git.router, prefix="/api/v1")
+    app.include_router(github.router, prefix="/api/v1")  # GitHub integration routes
     app.include_router(chats.router, prefix="/api/v1")
     app.include_router(memories.router, prefix="/api/v1")
     app.include_router(openspec.router, prefix="/api/v1")
     app.include_router(websocket.router, prefix="/api/v1")
     app.include_router(task_generation.router, prefix="/api/v1")
     app.include_router(workflows.router, prefix="/api/v1")
+
+    # Include webhook routers (public endpoints)
+    app.include_router(github_webhooks.router, prefix="/api/v1")  # GitHub webhooks
 
     # Health check endpoint
     @app.get("/health")
