@@ -639,8 +639,6 @@ async def test_openspec_proposal(
     Returns:
         Dictionary with proposal data
     """
-    from datetime import datetime
-
     from ardha.models.openspec import OpenSpecProposal
 
     proposal = OpenSpecProposal(
@@ -1015,3 +1013,157 @@ def mock_env_encryption_key(encryption_key, monkeypatch):
     """Set GITHUB_TOKEN_ENCRYPTION_KEY environment variable."""
     monkeypatch.setenv("GITHUB_TOKEN_ENCRYPTION_KEY", encryption_key)
     yield encryption_key
+
+
+# ============= Database Model Fixtures for Repository Tests =============
+
+
+@pytest_asyncio.fixture
+async def sample_user(test_db: AsyncSession):
+    """Create a sample User for repository tests."""
+    from ardha.models.user import User
+
+    user = User(
+        email="repotest@example.com",
+        username="repotest",
+        full_name="Repo Test User",
+        password_hash="hashed_password_123",
+        is_active=True,
+    )
+    test_db.add(user)
+    await test_db.flush()
+    await test_db.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def sample_project(test_db: AsyncSession, sample_user):
+    """Create a sample Project for repository tests."""
+    from ardha.models.project import Project
+    from ardha.models.project_member import ProjectMember
+
+    project = Project(
+        name="GitHub Integration Test Project",
+        slug="github-integration-test",
+        description="Test project for GitHub integration",
+        owner_id=sample_user.id,
+        visibility="private",
+    )
+    test_db.add(project)
+    await test_db.flush()
+    await test_db.refresh(project)
+
+    # Add owner as member
+    member = ProjectMember(
+        project_id=project.id,
+        user_id=sample_user.id,
+        role="owner",
+    )
+    test_db.add(member)
+    await test_db.flush()
+
+    return project
+
+
+@pytest_asyncio.fixture
+async def sample_github_integration(test_db: AsyncSession, sample_user, sample_project):
+    """Create a sample GitHubIntegration for repository tests."""
+    from ardha.models.github_integration import GitHubIntegration
+
+    integration = GitHubIntegration(
+        project_id=sample_project.id,
+        repository_owner="ardhaecosystem",
+        repository_name="Ardha",
+        repository_url="https://github.com/ardhaecosystem/Ardha",
+        default_branch="main",
+        access_token_encrypted="encrypted_test_token_abc123",
+        created_by_user_id=sample_user.id,
+        connection_status="disconnected",
+        is_active=True,
+    )
+    test_db.add(integration)
+    await test_db.flush()
+    await test_db.refresh(integration)
+    return integration
+
+
+@pytest_asyncio.fixture
+async def sample_pull_request(test_db: AsyncSession, sample_github_integration, sample_project):
+    """Create a sample PullRequest for repository tests."""
+    from ardha.models.github_integration import PullRequest
+
+    pr = PullRequest(
+        github_integration_id=sample_github_integration.id,
+        project_id=sample_project.id,
+        pr_number=1,
+        github_pr_id=123456789,
+        title="Test Pull Request",
+        description="This is a test PR for repository testing",
+        state="open",
+        head_branch="feature/test",
+        base_branch="main",
+        head_sha="abc123def456",
+        author_github_username="testuser",
+        html_url="https://github.com/ardhaecosystem/Ardha/pull/1",
+        api_url="https://api.github.com/repos/ardhaecosystem/Ardha/pulls/1",
+    )
+    test_db.add(pr)
+    await test_db.flush()
+    await test_db.refresh(pr)
+    return pr
+
+
+@pytest_asyncio.fixture
+async def sample_tasks(test_db: AsyncSession, sample_user, sample_project) -> list:
+    """Create sample Tasks for repository tests."""
+    from ardha.models.task import Task
+
+    tasks = []
+    for i in range(3):
+        task = Task(
+            project_id=sample_project.id,
+            identifier=f"TAS-00{i+1}",
+            title=f"Test Task {i+1}",
+            description=f"Task description {i+1}",
+            status="todo",
+            priority="medium",
+            created_by_id=sample_user.id,
+        )
+        test_db.add(task)
+        tasks.append(task)
+
+    await test_db.flush()
+    for task in tasks:
+        await test_db.refresh(task)
+
+    return tasks
+
+
+@pytest_asyncio.fixture
+async def sample_git_commits(test_db: AsyncSession, sample_project, sample_user) -> list:
+    """Create sample GitCommits for repository tests."""
+    from datetime import datetime, timezone
+
+    from ardha.models.git_commit import GitCommit
+
+    commits = []
+    for i in range(3):
+        commit = GitCommit(
+            project_id=sample_project.id,
+            sha=f"abc{i}123def456789012345678901234567890",
+            short_sha=f"abc{i}12",
+            message=f"feat: test commit {i+1}",
+            author_name="Test Author",
+            author_email="author@example.com",
+            committed_at=datetime.now(timezone.utc),
+            branch="main",
+            ardha_user_id=sample_user.id,
+        )
+        test_db.add(commit)
+        commits.append(commit)
+
+    await test_db.flush()
+    for commit in commits:
+        await test_db.refresh(commit)
+
+    return commits
