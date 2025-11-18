@@ -16,6 +16,11 @@ from ardha.core.database import get_db
 from ardha.main import app
 from ardha.models.base import Base
 
+# Import GitHub fixtures (used by pytest fixture discovery)
+from tests.fixtures.github_fixtures import github_integration, mock_github_api_responses  # noqa: F401
+from tests.fixtures.github_fixtures import sample_pull_request as github_sample_pull_request
+from tests.fixtures.github_fixtures import sample_webhook_payload  # noqa: F401
+
 # Test database URL (separate from development database)
 TEST_DATABASE_URL = "postgresql+asyncpg://ardha_user:ardha_password@localhost:5432/ardha_test"
 
@@ -1093,9 +1098,13 @@ async def sample_github_integration(test_db: AsyncSession, sample_user, sample_p
     return integration
 
 
+# Use sample_pull_request from github_fixtures.py for integration tests
+# Keep a repository-level fixture with different name for unit tests
 @pytest_asyncio.fixture
-async def sample_pull_request(test_db: AsyncSession, sample_github_integration, sample_project):
-    """Create a sample PullRequest for repository tests."""
+async def sample_pull_request_repo(
+    test_db: AsyncSession, sample_github_integration, sample_project
+):
+    """Create a sample PullRequest for repository unit tests (uses sample_user)."""
     from ardha.models.github_integration import PullRequest
 
     pr = PullRequest(
@@ -1117,6 +1126,10 @@ async def sample_pull_request(test_db: AsyncSession, sample_github_integration, 
     await test_db.flush()
     await test_db.refresh(pr)
     return pr
+
+
+# Alias for integration tests - uses github_integration (test_user)
+sample_pull_request = github_sample_pull_request
 
 
 @pytest_asyncio.fixture

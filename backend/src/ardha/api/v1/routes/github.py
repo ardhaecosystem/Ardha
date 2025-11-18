@@ -34,7 +34,6 @@ from ardha.schemas.responses.github import (
     PullRequestWithDetailsResponse,
     WebhookResponse,
 )
-from ardha.services.git_commit_service import GitCommitService
 from ardha.services.github_integration_service import (
     GitHubIntegrationExistsError,
     GitHubIntegrationNotFoundError,

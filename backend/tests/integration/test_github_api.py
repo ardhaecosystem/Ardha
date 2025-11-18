@@ -5,18 +5,11 @@ Tests GitHub integration setup, pull request management, webhook processing,
 and task automation features.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from tests.fixtures.github_fixtures import (
-    github_integration,
-    mock_github_api_responses,
-    sample_pull_request,
-    sample_webhook_payload,
-)
 
 
 @pytest.mark.asyncio
@@ -407,7 +400,7 @@ class TestGitHubWebhooks:
         payload["repository"]["owner"]["login"] = github_integration.repository_owner
         payload["repository"]["name"] = github_integration.repository_name
 
-        with patch("ardha.api.v1.webhooks.github.process_webhook_async") as mock_process:
+        with patch("ardha.api.v1.webhooks.github.process_webhook_async"):
             response = await client.post(
                 "/api/v1/webhooks/github",
                 json=payload,
@@ -437,7 +430,7 @@ class TestGitHubWebhooks:
         payload["repository"]["owner"]["login"] = github_integration.repository_owner
         payload["repository"]["name"] = github_integration.repository_name
 
-        with patch("ardha.api.v1.webhooks.github.process_webhook_async") as mock_process:
+        with patch("ardha.api.v1.webhooks.github.process_webhook_async"):
             response = await client.post(
                 "/api/v1/webhooks/github",
                 json=payload,
@@ -461,7 +454,7 @@ class TestGitHubWebhooks:
         payload["repository"]["owner"]["login"] = github_integration.repository_owner
         payload["repository"]["name"] = github_integration.repository_name
 
-        with patch("ardha.api.v1.webhooks.github.process_webhook_async") as mock_process:
+        with patch("ardha.api.v1.webhooks.github.process_webhook_async"):
             response = await client.post(
                 "/api/v1/webhooks/github",
                 json=payload,
@@ -526,7 +519,8 @@ class TestTaskAutomation:
         client: AsyncClient,
         auth_headers: dict,
         github_integration,
-        test_task: dict,
+        test_user: dict,
+        test_project: dict,
         test_db: AsyncSession,
         mock_env_encryption_key,
     ):
@@ -534,6 +528,22 @@ class TestTaskAutomation:
         from uuid import UUID
 
         from ardha.models.github_integration import PullRequest
+        from ardha.models.task import Task
+
+        # Create task directly in database to avoid API greenlet issues
+        # Use "in_review" status so it can transition to "done"
+        task = Task(
+            project_id=UUID(test_project["id"]),
+            identifier="TAS-001",
+            title="Test Task for PR",
+            description="Task to be closed by PR merge",
+            status="in_review",  # Must be in_review to transition to done
+            priority="medium",
+            created_by_id=UUID(test_user["user"]["id"]),
+        )
+        test_db.add(task)
+        await test_db.flush()
+        await test_db.refresh(task)
 
         # Create PR that closes the task
         pr = PullRequest(
@@ -542,7 +552,7 @@ class TestTaskAutomation:
             pr_number=123,
             github_pr_id=999,
             title="Fix bug",
-            description=f"Closes {test_task['identifier']}",
+            description=f"Closes {task.identifier}",
             state="open",
             head_branch="bugfix",
             base_branch="main",
@@ -550,7 +560,7 @@ class TestTaskAutomation:
             author_github_username="testuser",
             html_url="https://github.com/test/repo/pull/123",
             api_url="https://api.github.com/repos/test/repo/pulls/123",
-            closes_task_ids=[test_task["id"]],
+            closes_task_ids=[str(task.id)],
         )
 
         test_db.add(pr)
@@ -583,7 +593,7 @@ class TestTaskAutomation:
             from ardha.repositories.task_repository import TaskRepository
 
             task_repo = TaskRepository(test_db)
-            updated_task = await task_repo.get_by_id(UUID(test_task["id"]))
+            updated_task = await task_repo.get_by_id(task.id)
             assert updated_task is not None
             assert updated_task.status == "done"
 

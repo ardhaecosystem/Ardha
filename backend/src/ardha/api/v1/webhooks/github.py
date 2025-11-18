@@ -7,9 +7,8 @@ verification. Processes events asynchronously for fast response times.
 
 import json
 import logging
-from typing import Dict
 
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ardha.core.database import get_db
@@ -40,10 +39,11 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 async def receive_github_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
     x_github_event: str = Header(..., alias="X-GitHub-Event"),
     x_github_delivery: str = Header(..., alias="X-GitHub-Delivery"),
     x_hub_signature_256: str = Header(..., alias="X-Hub-Signature-256"),
-) -> dict:
+) -> dict:  # noqa
     """
     Receive GitHub webhook event.
 
@@ -104,34 +104,30 @@ async def receive_github_webhook(
         f"(delivery {x_github_delivery})"
     )
 
-    # Find GitHub integration by repository
-    # We need to create a database session here
-    from ardha.core.database import async_session_factory
+    # Find GitHub integration by repository (using injected db session)
+    integration_repo = GitHubIntegrationRepository(db)
+    integration = await integration_repo.get_by_repository(repo_owner, repo_name)
 
-    async with async_session_factory() as db:
-        integration_repo = GitHubIntegrationRepository(db)
-        integration = await integration_repo.get_by_repository(repo_owner, repo_name)
-
-        if not integration:
-            logger.warning(f"No integration found for repository {repo_owner}/{repo_name}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No integration configured for repository {repo_owner}/{repo_name}",
-            )
-
-        # Extract action from payload
-        action = payload.get("action")
-
-        # Queue webhook processing in background
-        background_tasks.add_task(
-            process_webhook_async,
-            integration_id=str(integration.id),  # Convert UUID to string
-            delivery_id=x_github_delivery,
-            event_type=x_github_event,
-            action=action,
-            payload=payload,
-            signature=x_hub_signature_256,
+    if not integration:
+        logger.warning(f"No integration found for repository {repo_owner}/{repo_name}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No integration configured for repository {repo_owner}/{repo_name}",
         )
+
+    # Extract action from payload
+    action = payload.get("action")
+
+    # Queue webhook processing in background
+    background_tasks.add_task(
+        process_webhook_async,
+        integration_id=str(integration.id),  # Convert UUID to string
+        delivery_id=x_github_delivery,
+        event_type=x_github_event,
+        action=action,
+        payload=payload,
+        signature=x_hub_signature_256,
+    )
 
     # Return 200 immediately (GitHub expects response within 10 seconds)
     logger.info(f"Queued webhook {x_github_delivery} for async processing")
@@ -150,7 +146,7 @@ async def process_webhook_async(
     delivery_id: str,
     event_type: str,
     action: str | None,
-    payload: Dict,
+    payload: dict,
     signature: str,
 ) -> None:
     """
@@ -187,7 +183,7 @@ async def process_webhook_async(
             settings = get_settings()
             commit_service = GitCommitService(
                 db,
-                str(settings.files.project_root) if hasattr(settings, "files") else "/tmp",
+                str(settings.files.project_root) if hasattr(settings, "files") else "/tmp",  # nosec B108
             )
 
             # Initialize webhook service

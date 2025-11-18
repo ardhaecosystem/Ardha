@@ -10,7 +10,8 @@ import hashlib
 import hmac
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, List, Optional
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,9 +83,9 @@ class GitHubWebhookService:
         delivery_id: str,
         event_type: str,
         action: Optional[str],
-        payload: Dict,
+        payload: dict,
         signature: str,
-    ) -> Dict:
+    ) -> dict:
         """
         Process GitHub webhook event.
 
@@ -168,7 +169,7 @@ class GitHubWebhookService:
 
     # ============= Event Handlers =============
 
-    async def handle_pull_request_event(self, payload: Dict) -> None:
+    async def handle_pull_request_event(self, payload: dict) -> None:
         """
         Handle pull_request webhook event.
 
@@ -184,7 +185,6 @@ class GitHubWebhookService:
 
         # Extract PR information
         pr_number = pr_data.get("number")
-        pr_id = pr_data.get("id")
         repo_owner = repo_data.get("owner", {}).get("login")
         repo_name = repo_data.get("name")
 
@@ -243,7 +243,7 @@ class GitHubWebhookService:
 
         logger.info(f"Completed PR event processing for PR #{pr_number}")
 
-    async def handle_push_event(self, payload: Dict) -> None:
+    async def handle_push_event(self, payload: dict) -> None:
         """
         Handle push webhook event.
 
@@ -276,10 +276,14 @@ class GitHubWebhookService:
             message = commit_data.get("message", "")
 
             # Check if commit exists in database
-            from ardha.repositories.git_commit import GitCommitRepository
+            from ardha.repositories.git_commit import (
+                GitCommitRepository,
+            )
 
             commit_repo = GitCommitRepository(self.db)
-            existing_commit = await commit_repo.get_by_sha(integration.project_id, sha)
+            existing_commit = await commit_repo.get_by_sha(
+                integration.project_id, sha
+            )
 
             if not existing_commit and sha and message:
                 # Create commit record (simplified - full implementation would sync via commit_service)
@@ -297,7 +301,7 @@ class GitHubWebhookService:
 
         logger.info(f"Completed push event processing for {len(commits)} commits")
 
-    async def handle_pull_request_review_event(self, payload: Dict) -> None:
+    async def handle_pull_request_review_event(self, payload: dict) -> None:
         """
         Handle pull_request_review webhook event.
 
@@ -352,7 +356,7 @@ class GitHubWebhookService:
 
         logger.info(f"Updated review status for PR #{pr_number}")
 
-    async def handle_check_suite_event(self, payload: Dict) -> None:
+    async def handle_check_suite_event(self, payload: dict) -> None:
         """
         Handle check_suite webhook event.
 
@@ -407,7 +411,7 @@ class GitHubWebhookService:
 
                 logger.info(f"Updated checks status for PR #{pr.pr_number} to {checks_status}")
 
-    async def handle_check_run_event(self, payload: Dict) -> None:
+    async def handle_check_run_event(self, payload: dict) -> None:
         """
         Handle check_run webhook event.
 
@@ -453,7 +457,7 @@ class GitHubWebhookService:
 
                 logger.info(f"Updated check run for PR #{pr.pr_number}")
 
-    async def handle_status_event(self, payload: Dict) -> None:
+    async def handle_status_event(self, payload: dict) -> None:
         """
         Handle status webhook event (commit status updates).
 
@@ -493,7 +497,7 @@ class GitHubWebhookService:
     async def verify_webhook_signature(
         self,
         integration_id: UUID,
-        payload: Dict,
+        payload: dict,
         signature_header: str,
     ) -> bool:
         """
@@ -541,7 +545,7 @@ class GitHubWebhookService:
 
     # ============= Task ID Extraction =============
 
-    async def extract_task_ids_from_pr(self, pr_data: Dict) -> Tuple[List[str], List[str]]:
+    async def extract_task_ids_from_pr(self, pr_data: dict) -> tuple[List[str], List[str]]:
         """
         Extract task IDs from PR title and body.
 
@@ -558,11 +562,12 @@ class GitHubWebhookService:
         combined_text = f"{title}\n{body}"
 
         # Use GitService to parse task IDs
-        from pathlib import Path
+        from tempfile import gettempdir
 
         from ardha.services.git_service import GitService
 
-        git_service = GitService(Path("/tmp"))
+        temp_path = Path(gettempdir())  # Use system temp dir
+        git_service = GitService(temp_path)  # noqa: S108
         task_info = git_service.parse_commit_message(combined_text)
 
         mentioned_ids = task_info.get("mentioned", [])
@@ -627,7 +632,7 @@ class GitHubWebhookService:
     async def _create_pr_from_payload(
         self,
         integration: Any,  # GitHubIntegration
-        pr_data: Dict,
+        pr_data: dict,
     ) -> Any:  # PullRequest
         """
         Create PullRequest from webhook payload.
@@ -672,7 +677,7 @@ class GitHubWebhookService:
         logger.info(f"Created PR #{pr.pr_number} from webhook payload")
         return pr
 
-    async def _update_pr_from_payload(self, pr_id: UUID, pr_data: Dict) -> None:
+    async def _update_pr_from_payload(self, pr_id: UUID, pr_data: dict) -> None:
         """
         Update PR from webhook payload.
 
@@ -697,12 +702,12 @@ class GitHubWebhookService:
             )
 
         await self.pr_repo.update(pr_id, update_data)
-        logger.info(f"Updated PR from webhook payload")
+        logger.info("Updated PR from webhook payload")
 
     async def _link_pr_to_tasks_from_payload(
         self,
         pr_id: Optional[UUID],
-        pr_data: Dict,
+        pr_data: dict,
         project_id: UUID,
     ) -> None:
         """
@@ -784,11 +789,12 @@ class GitHubWebhookService:
             is_default_branch: Whether commit is to default branch
         """
         # Parse commit message
-        from pathlib import Path
+        from tempfile import gettempdir
 
         from ardha.services.git_service import GitService
 
-        git_service = GitService(Path("/tmp"))
+        temp_path = Path(gettempdir())  # Use system temp dir
+        git_service = GitService(temp_path)  # noqa: S108
         task_info = git_service.parse_commit_message(commit_message)
 
         # Get closing task IDs

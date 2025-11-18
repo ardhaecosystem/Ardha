@@ -8,9 +8,9 @@ and task automation.
 
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -747,7 +747,7 @@ class GitHubIntegrationService:
 
         try:
             # Merge PR on GitHub
-            merge_result = await client.merge_pull_request(
+            await client.merge_pull_request(
                 integration.repository_owner,
                 integration.repository_name,
                 pr.pr_number,
@@ -1331,10 +1331,13 @@ class GitHubIntegrationService:
             return
 
         # Use GitService to parse task IDs from description
+        from tempfile import gettempdir
+
         from ardha.services.git_service import GitService
 
         # Create a temporary GitService instance for parsing
-        git_service = GitService(Path("/tmp"))  # Path doesn't matter for parsing
+        temp_path = Path(gettempdir())  # Use system temp dir
+        git_service = GitService(temp_path)  # noqa: S108
         task_info = git_service.parse_commit_message(pr.description)
 
         # Extract mentioned and closes IDs

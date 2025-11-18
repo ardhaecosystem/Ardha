@@ -6,7 +6,7 @@ database queries and CRUD operations for tasks, dependencies, tags, and activiti
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
@@ -281,9 +281,9 @@ class TaskRepository:
 
         # Update timestamps based on status
         if status == "in_progress" and old_status == "todo":
-            task.started_at = datetime.utcnow()
+            task.started_at = datetime.now(timezone.utc)
         elif status == "done" and old_status != "done":
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(timezone.utc)
         elif status == "todo" and old_status == "done":
             # Reopening task
             task.completed_at = None
