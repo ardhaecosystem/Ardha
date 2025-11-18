@@ -36,6 +36,7 @@ from ardha.models.base import Base, BaseModel
 
 if TYPE_CHECKING:
     from ardha.models.file import File
+    from ardha.models.github_integration import PullRequest
     from ardha.models.project import Project
     from ardha.models.task import Task
     from ardha.models.user import User
@@ -313,6 +314,12 @@ class GitCommit(Base, BaseModel):
     files: Mapped[list["File"]] = relationship(
         "File",
         secondary=file_commits,
+        back_populates="commits",
+    )
+
+    pull_requests: Mapped[list["PullRequest"]] = relationship(
+        "PullRequest",
+        secondary="pr_commits",
         back_populates="commits",
     )
 

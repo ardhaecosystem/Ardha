@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from ardha.models.chat import Chat
     from ardha.models.file import File
     from ardha.models.git_commit import GitCommit
+    from ardha.models.github_integration import GitHubIntegration, PullRequest
     from ardha.models.memory import Memory
     from ardha.models.milestone import Milestone
     from ardha.models.openspec import OpenSpecProposal
@@ -163,6 +164,20 @@ class Project(BaseModel, Base):
 
     git_commits: Mapped[list["GitCommit"]] = relationship(
         "GitCommit",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    github_integration: Mapped["GitHubIntegration | None"] = relationship(
+        "GitHubIntegration",
+        back_populates="project",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    pull_requests: Mapped[list["PullRequest"]] = relationship(
+        "PullRequest",
         back_populates="project",
         cascade="all, delete-orphan",
         lazy="select",

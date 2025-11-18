@@ -10,6 +10,8 @@ from ardha.models.base import Base
 from ardha.models.chat import Chat  # noqa: F401
 from ardha.models.file import File  # noqa: F401
 from ardha.models.git_commit import GitCommit  # noqa: F401
+from ardha.models.github_integration import GitHubIntegration, PullRequest  # noqa: F401
+from ardha.models.github_webhook import GitHubWebhookDelivery  # noqa: F401
 from ardha.models.memory import Memory  # noqa: F401
 from ardha.models.message import Message  # noqa: F401
 from ardha.models.milestone import Milestone  # noqa: F401

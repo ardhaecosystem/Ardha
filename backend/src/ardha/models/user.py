@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from ardha.models.chat import Chat
     from ardha.models.file import File
     from ardha.models.git_commit import GitCommit
+    from ardha.models.github_integration import PullRequest
     from ardha.models.memory import Memory
     from ardha.models.openspec import OpenSpecProposal
     from ardha.models.project import Project
@@ -155,6 +156,13 @@ class User(Base, BaseModel):
         "GitCommit",
         foreign_keys="GitCommit.ardha_user_id",
         back_populates="ardha_user",
+        lazy="select",
+    )
+
+    authored_pull_requests: Mapped[list["PullRequest"]] = relationship(
+        "PullRequest",
+        foreign_keys="PullRequest.author_user_id",
+        back_populates="author_user",
         lazy="select",
     )
 

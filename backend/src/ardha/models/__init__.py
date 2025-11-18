@@ -9,6 +9,8 @@ from ardha.models.base import Base, BaseModel, SoftDeleteMixin
 from ardha.models.chat import Chat
 from ardha.models.file import File
 from ardha.models.git_commit import GitCommit
+from ardha.models.github_integration import GitHubIntegration, PullRequest
+from ardha.models.github_webhook import GitHubWebhookDelivery
 from ardha.models.message import Message
 from ardha.models.milestone import Milestone
 from ardha.models.openspec import OpenSpecProposal
@@ -40,4 +42,7 @@ __all__ = [
     "OpenSpecProposal",
     "File",
     "GitCommit",
+    "GitHubIntegration",
+    "PullRequest",
+    "GitHubWebhookDelivery",
 ]

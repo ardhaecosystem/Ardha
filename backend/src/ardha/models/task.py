@@ -35,6 +35,7 @@ from ardha.models.base import Base, BaseModel
 
 if TYPE_CHECKING:
     from ardha.models.git_commit import GitCommit
+    from ardha.models.github_integration import PullRequest
     from ardha.models.milestone import Milestone
     from ardha.models.openspec import OpenSpecProposal
     from ardha.models.project import Project
@@ -325,6 +326,13 @@ class Task(Base, BaseModel):
     related_commits: Mapped[list["GitCommit"]] = relationship(
         "GitCommit",
         secondary="task_commits",
+        back_populates="linked_tasks",
+    )
+
+    # Many-to-many: Pull requests relationship
+    pull_requests: Mapped[list["PullRequest"]] = relationship(
+        "PullRequest",
+        secondary="pr_tasks",
         back_populates="linked_tasks",
     )
 
