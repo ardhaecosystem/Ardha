@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ardha.models.base import Base, BaseModel
@@ -80,6 +80,7 @@ class DatabaseEntry(BaseModel, Base):
     last_edited_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
+        server_default=func.now(),
         comment="Timestamp when entry was last edited",
     )
 
