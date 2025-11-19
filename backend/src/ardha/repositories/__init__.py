@@ -8,6 +8,9 @@ between the service layer and SQLAlchemy models.
 
 from ardha.repositories.ai_usage_repository import AIUsageRepository
 from ardha.repositories.chat_repository import ChatRepository
+from ardha.repositories.database_entry_repository import DatabaseEntryRepository
+from ardha.repositories.database_property_repository import DatabasePropertyRepository
+from ardha.repositories.database_repository import DatabaseRepository
 from ardha.repositories.file import FileRepository
 from ardha.repositories.git_commit import GitCommitRepository
 from ardha.repositories.github_integration import GitHubIntegrationRepository
@@ -32,4 +35,7 @@ __all__ = [
     "GitCommitRepository",
     "GitHubIntegrationRepository",
     "PullRequestRepository",
+    "DatabaseRepository",
+    "DatabasePropertyRepository",
+    "DatabaseEntryRepository",
 ]
