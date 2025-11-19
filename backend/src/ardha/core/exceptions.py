@@ -329,3 +329,114 @@ class RollupCalculationError(ArdhaException):
         super().__init__(message, details)
         self.rollup_config = rollup_config
         self.property_id = property_id
+
+
+# ============= Database Exceptions =============
+
+
+class DatabaseNotFoundError(NotFoundError):
+    """Exception raised when database is not found."""
+
+    def __init__(self, message: str, database_id: Optional[str] = None):
+        """
+        Initialize database not found exception.
+
+        Args:
+            message: Error message
+            database_id: Optional database ID
+        """
+        super().__init__(message, resource_type="database", resource_id=database_id)
+
+
+class DatabasePropertyNotFoundError(NotFoundError):
+    """Exception raised when database property is not found."""
+
+    def __init__(self, message: str, property_id: Optional[str] = None):
+        """
+        Initialize database property not found exception.
+
+        Args:
+            message: Error message
+            property_id: Optional property ID
+        """
+        super().__init__(message, resource_type="database_property", resource_id=property_id)
+
+
+class DatabaseEntryNotFoundError(NotFoundError):
+    """Exception raised when database entry is not found."""
+
+    def __init__(self, message: str, entry_id: Optional[str] = None):
+        """
+        Initialize database entry not found exception.
+
+        Args:
+            message: Error message
+            entry_id: Optional entry ID
+        """
+        super().__init__(message, resource_type="database_entry", resource_id=entry_id)
+
+
+class InvalidPropertyValueError(ValidationError):
+    """Exception raised when property value validation fails."""
+
+    def __init__(
+        self,
+        message: str,
+        property_name: Optional[str] = None,
+        property_type: Optional[str] = None,
+        value: Any = None,
+    ):
+        """
+        Initialize invalid property value exception.
+
+        Args:
+            message: Error message
+            property_name: Name of property that failed validation
+            property_type: Type of property
+            value: Value that failed validation
+        """
+        super().__init__(message, field=property_name, value=value)
+        self.property_type = property_type
+
+
+class CircularDependencyError(ArdhaException):
+    """Exception raised when circular dependency detected in formulas/rollups."""
+
+    def __init__(
+        self,
+        message: str,
+        dependency_chain: Optional[List[str]] = None,
+        details: Optional[dict] = None,
+    ):
+        """
+        Initialize circular dependency exception.
+
+        Args:
+            message: Error message
+            dependency_chain: Chain of property IDs that form the cycle
+            details: Optional error details
+        """
+        super().__init__(message, details)
+        self.dependency_chain = dependency_chain or []
+
+
+class PropertyInUseError(ConflictError):
+    """Exception raised when attempting to delete property that is in use."""
+
+    def __init__(
+        self,
+        message: str,
+        property_id: Optional[str] = None,
+        used_by: Optional[List[str]] = None,
+    ):
+        """
+        Initialize property in use exception.
+
+        Args:
+            message: Error message
+            property_id: Property ID that is in use
+            used_by: List of property IDs that depend on this property
+        """
+        super().__init__(message)
+        self.property_id = property_id
+        self.used_by = used_by or []
