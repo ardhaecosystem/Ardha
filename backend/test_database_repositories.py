@@ -243,7 +243,7 @@ async def test_async_patterns():
     print("\n🔍 Testing Async Patterns...")
 
     try:
-        from inspect import isfunction, iscoroutinefunction, getmembers
+        from inspect import getmembers, iscoroutinefunction, isfunction
 
         from ardha.repositories import (
             DatabaseEntryRepository,

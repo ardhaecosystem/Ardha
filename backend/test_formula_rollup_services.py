@@ -12,20 +12,15 @@ Run with: poetry run python test_formula_rollup_services.py
 
 import asyncio
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from unittest.mock import AsyncMock
+from uuid import uuid4
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from ardha.core.exceptions import (
-    CircularReferenceError,
-    FormulaEvaluationError,
-    InvalidFormulaError,
-    RollupCalculationError,
-)
+from ardha.core.exceptions import FormulaEvaluationError
 from ardha.services.formula_service import FormulaService
 from ardha.services.rollup_service import RollupService
 
@@ -439,7 +434,7 @@ class TestRollupService:
         }
         valid, error = await self.service.validate_rollup_config(config)
         assert valid is True
-        print(f"✓ Valid config accepted")
+        print("✓ Valid config accepted")
         self.passed += 1
 
         # Missing field

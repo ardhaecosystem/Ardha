@@ -235,7 +235,6 @@ class OpenSpecFileNotFoundError(ArdhaException):
         self.missing_files = missing_files or []
 
 
-
 # ============= Formula & Rollup Exceptions =============
 
 

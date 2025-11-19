@@ -89,7 +89,8 @@ class RollupService:
 
             if not relation_property_id or not target_property_id or not function:
                 raise RollupCalculationError(
-                    "Rollup config must include relation_property_id, target_property_id, and function",
+                    "Rollup config must include relation_property_id, "
+                    "target_property_id, and function",
                     rollup_config=rollup_config,
                     property_id=str(property_id),
                 )
@@ -189,7 +190,9 @@ class RollupService:
                     entry_ids = []
                     for rel in relations:
                         if isinstance(rel, dict) and "id" in rel:
-                            entry_ids.append(UUID(rel["id"]) if isinstance(rel["id"], str) else rel["id"])
+                            entry_ids.append(
+                                UUID(rel["id"]) if isinstance(rel["id"], str) else rel["id"]
+                            )
                     return entry_ids
 
             return []

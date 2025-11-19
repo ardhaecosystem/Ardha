@@ -9,7 +9,6 @@ functions, logical operations, and property references.
 import logging
 import math
 import re
-import statistics
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set, Tuple
 from uuid import UUID
@@ -151,8 +150,7 @@ class FormulaService:
             return {"result": None, "error": str(e)}
         except Exception as e:
             logger.error(
-                f"Error evaluating formula for entry {entry_id}, "
-                f"property {property_id}: {e}",
+                f"Error evaluating formula for entry {entry_id}, " f"property {property_id}: {e}",
                 exc_info=True,
             )
             return {"result": None, "error": f"Evaluation error: {str(e)}"}
@@ -306,7 +304,9 @@ class FormulaService:
                 elif arg["type"] == "function":
                     # Reconstruct formula string for recursive evaluation
                     arg_formula = self._reconstruct_formula(arg)
-                    result = await self._evaluate_expression(arg_formula, entry_id, evaluation_chain)
+                    result = await self._evaluate_expression(
+                        arg_formula, entry_id, evaluation_chain
+                    )
                     evaluated_args.append(result)
 
             # Execute function with evaluated arguments
@@ -389,7 +389,8 @@ class FormulaService:
                     )
                     if result["error"]:
                         raise FormulaEvaluationError(
-                            f"Error evaluating referenced formula '{property_name}': {result['error']}"
+                            f"Error evaluating referenced formula "
+                            f"'{property_name}': {result['error']}"
                         )
                     return result["result"]
 
@@ -411,7 +412,9 @@ class FormulaService:
                         return datetime.fromisoformat(date_val["start"].replace("Z", "+00:00"))
                     return date_val
                 elif "select" in property_value:
-                    return property_value["select"].get("name") if property_value["select"] else None
+                    return (
+                        property_value["select"].get("name") if property_value["select"] else None
+                    )
                 else:
                     return property_value
 
@@ -420,7 +423,9 @@ class FormulaService:
         except CircularReferenceError:
             raise
         except Exception as e:
-            logger.error(f"Error resolving property reference '{property_name}': {e}", exc_info=True)
+            logger.error(
+                f"Error resolving property reference '{property_name}': {e}", exc_info=True
+            )
             raise FormulaEvaluationError(f"Failed to resolve property '{property_name}': {str(e)}")
 
     async def validate_formula_syntax(self, formula: str) -> Tuple[bool, Optional[str]]:
