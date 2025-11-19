@@ -8,10 +8,9 @@ filtering, template management, and statistics.
 
 import logging
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -244,9 +243,7 @@ class DatabaseRepository:
             result = await self.db.execute(stmt)
             return list(result.scalars().all())
         except SQLAlchemyError as e:
-            logger.error(
-                f"Error fetching template instances for {template_id}: {e}", exc_info=True
-            )
+            logger.error(f"Error fetching template instances for {template_id}: {e}", exc_info=True)
             raise
 
     async def update(self, database_id: UUID, updates: dict) -> Database | None:
@@ -571,13 +568,10 @@ class DatabaseRepository:
             entry_count = await self.get_entry_count(database_id)
 
             # Get last entry created timestamp
-            last_entry_stmt = (
-                select(func.max(DatabaseEntry.created_at))
-                .where(
-                    and_(
-                        DatabaseEntry.database_id == database_id,
-                        DatabaseEntry.is_archived.is_(False),
-                    )
+            last_entry_stmt = select(func.max(DatabaseEntry.created_at)).where(
+                and_(
+                    DatabaseEntry.database_id == database_id,
+                    DatabaseEntry.is_archived.is_(False),
                 )
             )
             last_entry_result = await self.db.execute(last_entry_stmt)

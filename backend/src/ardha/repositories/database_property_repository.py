@@ -6,7 +6,6 @@ handling all database operations for database column/field definitions.
 """
 
 import logging
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import and_, func, select
@@ -87,10 +86,7 @@ class DatabasePropertyRepository:
             await self.db.flush()
             await self.db.refresh(prop)
 
-            logger.info(
-                f"Created property {prop.id} '{prop.name}' "
-                f"for database {database_id}"
-            )
+            logger.info(f"Created property {prop.id} '{prop.name}' " f"for database {database_id}")
             return prop
         except IntegrityError as e:
             logger.warning(f"Integrity error creating property: {e}")
@@ -286,9 +282,7 @@ class DatabasePropertyRepository:
             result = await self.db.execute(stmt)
             return list(result.scalars().all())
         except SQLAlchemyError as e:
-            logger.error(
-                f"Error fetching properties of type {property_type}: {e}", exc_info=True
-            )
+            logger.error(f"Error fetching properties of type {property_type}: {e}", exc_info=True)
             raise
 
     async def get_formula_properties(self, database_id: UUID) -> list[DatabaseProperty]:
@@ -397,5 +391,7 @@ class DatabasePropertyRepository:
             count = result.scalar()
             return count if count is not None else 0
         except SQLAlchemyError as e:
-            logger.error(f"Error counting properties for database {database_id}: {e}", exc_info=True)
+            logger.error(
+                f"Error counting properties for database {database_id}: {e}", exc_info=True
+            )
             raise

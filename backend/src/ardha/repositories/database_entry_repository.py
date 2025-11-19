@@ -10,14 +10,13 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ardha.models.database_entry import DatabaseEntry
 from ardha.models.database_entry_value import DatabaseEntryValue
-from ardha.models.database_property import DatabaseProperty
 
 logger = logging.getLogger(__name__)
 
@@ -334,7 +333,10 @@ class DatabaseEntryRepository:
 
                 # Delete values not in updates (if value set to None explicitly)
                 for property_id_str, value_obj in existing_values.items():
-                    if property_id_str in values_updates and values_updates[property_id_str] is None:
+                    if (
+                        property_id_str in values_updates
+                        and values_updates[property_id_str] is None
+                    ):
                         await self.db.delete(value_obj)
 
             await self.db.flush()

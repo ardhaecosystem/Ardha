@@ -233,3 +233,100 @@ class OpenSpecFileNotFoundError(ArdhaException):
         super().__init__(message)
         self.file_path = file_path
         self.missing_files = missing_files or []
+
+
+
+# ============= Formula & Rollup Exceptions =============
+
+
+class FormulaEvaluationError(ArdhaException):
+    """
+    Exception raised when formula evaluation fails.
+
+    This includes errors during expression parsing, property resolution,
+    function execution, or type conversion.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        formula: Optional[str] = None,
+        property_id: Optional[str] = None,
+        details: Optional[dict] = None,
+    ):
+        """
+        Initialize formula evaluation exception.
+
+        Args:
+            message: Error message
+            formula: Formula expression that failed
+            property_id: Property ID being evaluated
+            details: Optional error details
+        """
+        super().__init__(message, details)
+        self.formula = formula
+        self.property_id = property_id
+
+
+class CircularReferenceError(FormulaEvaluationError):
+    """
+    Exception raised when circular reference detected in formula/rollup.
+
+    This prevents infinite loops when properties reference each other.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        property_chain: Optional[List[str]] = None,
+        details: Optional[dict] = None,
+    ):
+        """
+        Initialize circular reference exception.
+
+        Args:
+            message: Error message
+            property_chain: Chain of property IDs that form the cycle
+            details: Optional error details
+        """
+        super().__init__(message, details=details)
+        self.property_chain = property_chain or []
+
+
+class InvalidFormulaError(FormulaEvaluationError):
+    """
+    Exception raised when formula syntax is invalid.
+
+    This includes syntax errors, unknown functions, or invalid arguments.
+    """
+
+    pass
+
+
+class RollupCalculationError(ArdhaException):
+    """
+    Exception raised when rollup calculation fails.
+
+    This includes errors accessing related entries, missing properties,
+    or invalid aggregation operations.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        rollup_config: Optional[dict] = None,
+        property_id: Optional[str] = None,
+        details: Optional[dict] = None,
+    ):
+        """
+        Initialize rollup calculation exception.
+
+        Args:
+            message: Error message
+            rollup_config: Rollup configuration that failed
+            property_id: Property ID being calculated
+            details: Optional error details
+        """
+        super().__init__(message, details)
+        self.rollup_config = rollup_config
+        self.property_id = property_id

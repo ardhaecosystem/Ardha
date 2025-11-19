@@ -7,9 +7,15 @@ external APIs, and other services.
 """
 
 from ardha.services.auth_service import AuthService, InvalidCredentialsError, UserAlreadyExistsError
+from ardha.services.formula_service import FormulaService
+from ardha.services.rollup_service import RollupService
 
 __all__ = [
+    # Auth services
     "AuthService",
     "UserAlreadyExistsError",
     "InvalidCredentialsError",
+    # Database computation services
+    "FormulaService",
+    "RollupService",
 ]
