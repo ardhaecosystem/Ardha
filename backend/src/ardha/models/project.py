@@ -17,6 +17,7 @@ from ardha.models.base import Base, BaseModel
 if TYPE_CHECKING:
     from ardha.models.ai_usage import AIUsage
     from ardha.models.chat import Chat
+    from ardha.models.database import Database
     from ardha.models.file import File
     from ardha.models.git_commit import GitCommit
     from ardha.models.github_integration import GitHubIntegration, PullRequest
@@ -178,6 +179,13 @@ class Project(BaseModel, Base):
 
     pull_requests: Mapped[list["PullRequest"]] = relationship(
         "PullRequest",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    databases: Mapped[list["Database"]] = relationship(
+        "Database",
         back_populates="project",
         cascade="all, delete-orphan",
         lazy="select",

@@ -8,6 +8,11 @@ with the Base metadata for Alembic migrations.
 from ardha.models.ai_usage import AIUsage  # noqa: F401
 from ardha.models.base import Base
 from ardha.models.chat import Chat  # noqa: F401
+from ardha.models.database import Database  # noqa: F401
+from ardha.models.database_entry import DatabaseEntry  # noqa: F401
+from ardha.models.database_entry_value import DatabaseEntryValue  # noqa: F401
+from ardha.models.database_property import DatabaseProperty  # noqa: F401
+from ardha.models.database_view import DatabaseView  # noqa: F401
 from ardha.models.file import File  # noqa: F401
 from ardha.models.git_commit import GitCommit  # noqa: F401
 from ardha.models.github_integration import GitHubIntegration, PullRequest  # noqa: F401

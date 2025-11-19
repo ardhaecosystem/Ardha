@@ -19,6 +19,8 @@ from ardha.models.base import Base, BaseModel
 if TYPE_CHECKING:
     from ardha.models.ai_usage import AIUsage
     from ardha.models.chat import Chat
+    from ardha.models.database import Database
+    from ardha.models.database_view import DatabaseView
     from ardha.models.file import File
     from ardha.models.git_commit import GitCommit
     from ardha.models.github_integration import PullRequest
@@ -163,6 +165,20 @@ class User(Base, BaseModel):
         "PullRequest",
         foreign_keys="PullRequest.author_user_id",
         back_populates="author_user",
+        lazy="select",
+    )
+
+    created_databases: Mapped[list["Database"]] = relationship(
+        "Database",
+        foreign_keys="Database.created_by_user_id",
+        back_populates="created_by",
+        lazy="select",
+    )
+
+    created_views: Mapped[list["DatabaseView"]] = relationship(
+        "DatabaseView",
+        foreign_keys="DatabaseView.created_by_user_id",
+        back_populates="created_by",
         lazy="select",
     )
 
