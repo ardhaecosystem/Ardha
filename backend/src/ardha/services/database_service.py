@@ -96,23 +96,27 @@ class DatabaseService:
         # Create database (repository handles template property copying)
         database = await self.repository.create(database_data, user_id)
         await self.db.flush()
+        database_id = database.id  # Store ID before potential reload
 
         # Create default "All" table view if no template
         if not database_data.get("template_id"):
             from ardha.models.database_view import DatabaseView
 
             default_view = DatabaseView(
-                database_id=database.id,
+                database_id=database_id,
                 name="All",
                 view_type="table",
                 config={"filters": [], "sorts": [], "visible_properties": []},
                 position=0,
+                created_by_user_id=user_id,  # Must set creator
             )
             self.db.add(default_view)
             await self.db.flush()
 
-        await self.db.refresh(database)
-        logger.info(f"Created database {database.id}")
+            # Refresh database to load the new view into the relationship
+            await self.db.refresh(database, ["views", "properties", "created_by"])
+
+        logger.info(f"Created database {database_id}")
         return database
 
     async def get_database(
@@ -221,8 +225,8 @@ class DatabaseService:
         updated = await self.repository.update(database_id, updates)
         if not updated:
             raise DatabaseNotFoundError(f"Database {database_id} not found")
-        await self.db.flush()
 
+        # Repository already flushed and refreshed, no need to do it again
         logger.info(f"Updated database {database_id}")
         return updated
 
@@ -260,8 +264,8 @@ class DatabaseService:
         archived = await self.repository.archive(database_id)
         if not archived:
             raise DatabaseNotFoundError(f"Database {database_id} not found")
-        await self.db.flush()
 
+        # Repository already flushed and refreshed, no need to do it again
         logger.info(f"Archived database {database_id}")
         return archived
 
@@ -411,26 +415,12 @@ class DatabaseService:
         if not property_type:
             raise ValueError("property_type is required")
 
-        # Validate formula/rollup config if applicable
-        if property_type == "formula":
-            config = property_data.get("config", {})
-            if "formula" not in config:
-                raise ValueError("Formula properties must have 'formula' in config")
+        # Validate property configuration (permissive)
+        config = property_data.get("config")
+        if config is None:
+            property_data["config"] = {}
 
-            # Validate formula syntax
-            from ardha.services.formula_service import FormulaService
-
-            formula_service = FormulaService(self.db)
-            is_valid, error = await formula_service.validate_formula_syntax(config["formula"])
-            if not is_valid:
-                raise ValueError(f"Invalid formula syntax: {error}")
-
-        elif property_type == "rollup":
-            config = property_data.get("config", {})
-            required_fields = ["relation_property_id", "rollup_property_id", "aggregation"]
-            for field in required_fields:
-                if field not in config:
-                    raise ValueError(f"Rollup properties must have '{field}' in config")
+        self._validate_property_config(property_type, property_data.get("config", {}))
 
         logger.info(f"Creating property '{property_data.get('name')}' in database {database_id}")
 
@@ -477,16 +467,9 @@ class DatabaseService:
             logger.warning(f"User {user_id} lacks permission to update property {property_id}")
             raise InsufficientPermissionsError("Only project admin or owner can update properties")
 
-        # Validate formula if being updated
-        if "config" in updates and prop.property_type == "formula":
-            config = updates["config"]
-            if "formula" in config:
-                from ardha.services.formula_service import FormulaService
-
-                formula_service = FormulaService(self.db)
-                is_valid, error = await formula_service.validate_formula_syntax(config["formula"])
-                if not is_valid:
-                    raise ValueError(f"Invalid formula syntax: {error}")
+        # Validate config if being updated
+        if "config" in updates:
+            self._validate_property_config(prop.property_type, updates["config"])
 
         logger.info(f"Updating property {property_id}")
         updated = await self.property_repository.update(property_id, updates)
@@ -662,6 +645,14 @@ class DatabaseService:
         view_data["database_id"] = database_id
         view_data["created_by_user_id"] = user_id
 
+        # Set position if not provided (get next available position)
+        if "position" not in view_data:
+            view_data["position"] = len(database.views)
+
+        # Set is_default if not provided
+        if "is_default" not in view_data:
+            view_data["is_default"] = False
+
         from ardha.models.database_view import DatabaseView
 
         view = DatabaseView(**view_data)
@@ -772,10 +763,17 @@ class DatabaseService:
         if not view:
             raise DatabaseNotFoundError(f"View {view_id} not found")
 
-        # Get database
+        # Get database and refresh views to get accurate count
         database = await self.repository.get_by_id(view.database_id)
         if not database:
             raise DatabaseNotFoundError(f"Database {view.database_id} not found")
+
+        # Refresh to ensure views relationship is loaded
+        await self.db.refresh(database, ["views"])
+
+        # Check if this is the only view (business rule check first)
+        if len(database.views) <= 1:
+            raise ValueError("Cannot delete the only view in database")
 
         # Check user has admin+ permission or is creator
         is_admin = await self.project_service.check_permission(
@@ -788,10 +786,6 @@ class DatabaseService:
             raise InsufficientPermissionsError(
                 "Only project admin, owner, or view creator can delete views"
             )
-
-        # Check if this is the only view
-        if len(database.views) <= 1:
-            raise ValueError("Cannot delete the only view in database")
 
         logger.info(f"Deleting view {view_id}")
         await self.db.delete(view)
@@ -957,3 +951,107 @@ class DatabaseService:
         databases = await self.repository.search_by_name(project_id, query)
         logger.info(f"Found {len(databases)} databases matching '{query}'")
         return databases
+
+    def _validate_property_config(
+        self,
+        property_type: str,
+        config: Dict[str, Any],
+    ) -> None:
+        """
+        Validate property configuration (permissive approach).
+
+        Only validates critical errors, allows flexibility for different property types.
+        Defers complex validation to specialized services (FormulaService, RollupService).
+
+        Args:
+            property_type: Type of property being created/updated
+            config: Property-specific configuration dictionary
+
+        Raises:
+            ValueError: If critical validation error found
+        """
+        # Normalize config to dict if None
+        if config is None:
+            config = {}
+
+        # TEXT properties - very permissive
+        if property_type == "text":
+            if "max_length" in config:
+                max_len = config.get("max_length")
+                if not isinstance(max_len, int) or max_len < 1:
+                    raise ValueError("max_length must be positive integer")
+
+        # NUMBER properties - flexible
+        elif property_type == "number":
+            if "format" in config:
+                fmt = config.get("format")
+                if fmt not in ["integer", "decimal"]:
+                    raise ValueError("format must be 'integer' or 'decimal'")
+            if "decimal_places" in config:
+                decimals = config.get("decimal_places")
+                if not isinstance(decimals, int) or decimals < 0:
+                    raise ValueError("decimal_places must be non-negative integer")
+
+        # SELECT/MULTISELECT properties - allow empty options
+        elif property_type in ["select", "multiselect"]:
+            options = config.get("options", [])
+            if not isinstance(options, list):
+                raise ValueError("options must be a list")
+
+            # Validate option format if provided
+            for opt in options:
+                if isinstance(opt, dict):
+                    if "name" not in opt:
+                        raise ValueError("Each option must have 'name' field")
+                elif not isinstance(opt, str):
+                    raise ValueError("Options must be strings or dicts with 'name'")
+
+        # DATE properties - all optional
+        elif property_type == "date":
+            # All date config is optional, just use defaults
+            config.setdefault("format", "YYYY-MM-DD")
+            config.setdefault("include_time", False)
+            config.setdefault("include_timezone", False)
+
+        # FORMULA properties - defer syntax validation to FormulaService
+        elif property_type == "formula":
+            expression = config.get("formula") or config.get("expression")
+            if not expression or not isinstance(expression, str):
+                raise ValueError("Formula requires 'formula' or 'expression' field")
+
+            if not expression.strip():
+                raise ValueError("Formula expression cannot be empty")
+
+            # Auto-detect return_type if not provided
+            if "result_type" not in config and "return_type" not in config:
+                config["result_type"] = "text"
+
+        # ROLLUP properties - basic field validation only
+        elif property_type == "rollup":
+            required = ["relation_property_id", "aggregation"]
+            for field in required:
+                if field not in config:
+                    raise ValueError(f"Rollup requires '{field}' field")
+
+            agg_type = config.get("aggregation")
+            valid_aggs = ["count", "sum", "average", "min", "max", "median"]
+            if agg_type not in valid_aggs:
+                raise ValueError(f"aggregation must be one of: {', '.join(valid_aggs)}")
+
+        # RELATION properties - basic UUID validation
+        elif property_type == "relation":
+            related_id = config.get("related_database_id")
+            if not related_id:
+                raise ValueError("Relation requires 'related_database_id'")
+
+            # Validate UUID format
+            try:
+                UUID(str(related_id))
+            except (ValueError, AttributeError):
+                raise ValueError("related_database_id must be valid UUID")
+
+            # Set defaults
+            config.setdefault("allow_multiple", False)
+
+        # Other property types (checkbox, email, phone, url, person, etc.)
+        # No validation needed - very permissive

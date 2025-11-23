@@ -7,7 +7,7 @@ filtering, template management, and statistics.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import and_, func, select, update
@@ -203,7 +203,10 @@ class DatabaseRepository:
         try:
             stmt = (
                 select(Database)
-                .options(selectinload(Database.properties))
+                .options(
+                    selectinload(Database.properties),
+                    selectinload(Database.views),
+                )
                 .where(Database.is_template.is_(True))
             )
 
@@ -271,9 +274,21 @@ class DatabaseRepository:
                 if hasattr(database, key) and key not in ["id", "created_at", "created_by_user_id"]:
                     setattr(database, key, value)
 
-            database.updated_at = datetime.utcnow()
+            database.updated_at = datetime.now(timezone.utc)
             await self.db.flush()
-            await self.db.refresh(database)
+
+            # Query fresh object with eager loading to avoid any lazy loading issues
+            stmt = (
+                select(Database)
+                .options(
+                    selectinload(Database.properties),
+                    selectinload(Database.views),
+                    selectinload(Database.created_by),
+                )
+                .where(Database.id == database_id)
+            )
+            result = await self.db.execute(stmt)
+            database = result.scalar_one()
 
             logger.info(f"Updated database {database_id}")
             return database
@@ -305,7 +320,7 @@ class DatabaseRepository:
 
             # Archive database
             database.is_archived = True
-            database.archived_at = datetime.utcnow()
+            database.archived_at = datetime.now(timezone.utc)
 
             # Archive all entries (cascade)
             from ardha.models.database_entry import DatabaseEntry
@@ -315,12 +330,24 @@ class DatabaseRepository:
                 .where(DatabaseEntry.database_id == database_id)
                 .values(
                     is_archived=True,
-                    archived_at=datetime.utcnow(),
+                    archived_at=datetime.now(timezone.utc),
                 )
             )
 
             await self.db.flush()
-            await self.db.refresh(database)
+
+            # Query fresh object with eager loading to avoid any lazy loading issues
+            stmt = (
+                select(Database)
+                .options(
+                    selectinload(Database.properties),
+                    selectinload(Database.views),
+                    selectinload(Database.created_by),
+                )
+                .where(Database.id == database_id)
+            )
+            result = await self.db.execute(stmt)
+            database = result.scalar_one()
 
             logger.info(f"Archived database {database_id} and all entries")
             return database
@@ -483,18 +510,20 @@ class DatabaseRepository:
                     view_type=view.view_type,
                     config=view.config,
                     position=view.position,
+                    is_default=view.is_default,
+                    created_by_user_id=user_id,
                 )
                 self.db.add(new_view)
 
             await self.db.flush()
-            await self.db.refresh(new_db)
 
-            # Eager load relationships
+            # Query fresh with eager loading (don't use cached instance)
             stmt = (
                 select(Database)
                 .options(
                     selectinload(Database.properties),
                     selectinload(Database.views),
+                    selectinload(Database.created_by),
                 )
                 .where(Database.id == new_db.id)
             )

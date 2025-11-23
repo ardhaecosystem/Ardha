@@ -62,8 +62,8 @@ class DatabasePropertyRepository:
             if not database_id:
                 raise ValueError("database_id is required")
 
-            # Auto-assign position if not provided
-            if "position" not in property_data:
+            # Auto-assign position if not provided or None
+            if property_data.get("position") is None:
                 max_position_stmt = select(func.max(DatabaseProperty.position)).where(
                     DatabaseProperty.database_id == database_id
                 )

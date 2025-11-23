@@ -92,6 +92,7 @@ class DatabaseResponse(BaseModel):
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     is_archived: bool = Field(..., description="Whether database is archived")
+    archived_at: Optional[datetime] = Field(None, description="Archive timestamp")
 
 
 class DatabaseListResponse(BaseModel):
@@ -140,8 +141,10 @@ class EntryResponse(BaseModel):
     position: int = Field(..., description="Display order (0-based)")
     created_by: UserSummary = Field(..., description="User who created this entry")
     created_at: datetime = Field(..., description="Creation timestamp")
-    last_edited_by: UserSummary = Field(..., description="User who last edited")
+    last_edited_by: Optional[UserSummary] = Field(None, description="User who last edited")
     last_edited_at: datetime = Field(..., description="Last edit timestamp")
+    is_archived: bool = Field(default=False, description="Whether entry is archived")
+    archived_at: Optional[datetime] = Field(None, description="When entry was archived")
 
 
 class EntryListResponse(BaseModel):

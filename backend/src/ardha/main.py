@@ -9,6 +9,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from ardha.api.v1.routes import (
     auth,
     chats,
+    databases,
     files,
     git,
     github,
@@ -53,6 +54,7 @@ def create_app() -> FastAPI:
     app.include_router(projects.router, prefix="/api/v1")
     app.include_router(milestones.router, prefix="/api/v1/milestones")
     app.include_router(tasks.router, prefix="/api/v1")
+    app.include_router(databases.router, prefix="/api/v1")
     app.include_router(files.router, prefix="/api/v1")
     app.include_router(git.router, prefix="/api/v1")
     app.include_router(github.router, prefix="/api/v1")  # GitHub integration routes

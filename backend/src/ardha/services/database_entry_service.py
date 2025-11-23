@@ -6,7 +6,6 @@ value validation, formula/rollup recalculation, bulk operations, and permission 
 """
 
 import logging
-import re
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -99,7 +98,7 @@ class DatabaseEntryService:
         for prop in required_props:
             prop_id_str = str(prop.id)
             if prop_id_str not in values or values[prop_id_str] is None:
-                raise DatabasePropertyNotFoundError(
+                raise InvalidPropertyValueError(
                     f"Required property '{prop.name}' (ID: {prop.id}) must be provided"
                 )
 
@@ -131,6 +130,10 @@ class DatabaseEntryService:
         # For MVP, this is a placeholder
 
         await self.db.refresh(entry)
+
+        # Ensure relationships are loaded for Pydantic validation
+        await self.db.refresh(entry, ["values", "created_by", "last_edited_by"])
+
         logger.info(f"Created entry {entry.id}")
         return entry
 
@@ -262,9 +265,11 @@ class DatabaseEntryService:
             logger.warning(f"User {user_id} lacks permission to update entry {entry_id}")
             raise InsufficientPermissionsError("Only project members can update entries")
 
-        # Validate updated values
+        # Validate updated values (skip required check for updates)
         if "values" in updates:
-            is_valid, error = await self.validate_entry_values(entry.database_id, updates["values"])
+            is_valid, error = await self.validate_entry_values(
+                entry.database_id, updates["values"], check_required=False
+            )
             if not is_valid:
                 raise InvalidPropertyValueError(error or "Invalid entry values")
 
@@ -286,6 +291,10 @@ class DatabaseEntryService:
         # Note: RollupService would be used here in full implementation
 
         await self.db.refresh(updated)
+
+        # Ensure relationships are loaded for Pydantic validation
+        await self.db.refresh(updated, ["values", "created_by", "last_edited_by"])
+
         logger.info(f"Updated entry {entry_id}")
         return updated
 
@@ -327,6 +336,9 @@ class DatabaseEntryService:
         if not archived:
             raise DatabaseEntryNotFoundError(f"Entry {entry_id} not found")
         await self.db.flush()
+
+        # Ensure relationships are loaded for Pydantic validation
+        await self.db.refresh(archived, ["values", "created_by", "last_edited_by"])
 
         logger.info(f"Archived entry {entry_id}")
         return archived
@@ -589,6 +601,9 @@ class DatabaseEntryService:
         formula_service = FormulaService(self.db)
         await formula_service.recalculate_entry_formulas(new_entry.id)
 
+        # Ensure relationships are loaded for Pydantic validation
+        await self.db.refresh(new_entry, ["values", "created_by", "last_edited_by"])
+
         logger.info(f"Duplicated entry {entry_id}")
         return new_entry
 
@@ -667,6 +682,9 @@ class DatabaseEntryService:
         updated_entry = await self.entry_repository.get_by_id(entry_id)
         if not updated_entry:
             raise DatabaseEntryNotFoundError(f"Entry {entry_id} not found")
+
+        # Ensure relationships are loaded for Pydantic validation
+        await self.db.refresh(updated_entry, ["values", "created_by", "last_edited_by"])
 
         logger.info(f"Set value for entry {entry_id}")
         return updated_entry
@@ -794,6 +812,7 @@ class DatabaseEntryService:
         self,
         database_id: UUID,
         values: Dict[str, Any],
+        check_required: bool = True,
     ) -> Tuple[bool, Optional[str]]:
         """
         Validate all values against property types.
@@ -801,6 +820,7 @@ class DatabaseEntryService:
         Args:
             database_id: UUID of the database
             values: Dictionary mapping property_id (str) to value
+            check_required: Whether to check for required fields (False for updates)
 
         Returns:
             Tuple of (is_valid, error_message)
@@ -812,15 +832,15 @@ class DatabaseEntryService:
             properties = await self.property_repository.get_by_database(database_id)
             property_map = {str(p.id): p for p in properties}
 
-            # Get required properties
-            required_props = await self.property_repository.get_required_properties(database_id)
-            required_ids = {str(p.id) for p in required_props}
+            # Check required properties only if check_required=True (for creates)
+            if check_required:
+                required_props = await self.property_repository.get_required_properties(database_id)
+                required_ids = {str(p.id) for p in required_props}
 
-            # Check required properties are present
-            for req_id in required_ids:
-                if req_id not in values or values[req_id] is None:
-                    prop = property_map[req_id]
-                    return (False, f"Required property '{prop.name}' must be provided")
+                for req_id in required_ids:
+                    if req_id not in values or values[req_id] is None:
+                        prop = property_map[req_id]
+                        return (False, f"Required property '{prop.name}' must be provided")
 
             # Validate each provided value
             for property_id_str, value in values.items():
@@ -834,10 +854,14 @@ class DatabaseEntryService:
                     continue
 
                 # Validate value type
-                if not self._validate_value_for_type(prop.property_type, value, prop.config):
+                is_valid, error_msg = self._validate_value_for_type(
+                    prop.property_type, value, prop.config, prop.name
+                )
+                if not is_valid:
                     return (
                         False,
-                        f"Invalid value for property '{prop.name}' of type {prop.property_type}",
+                        error_msg
+                        or f"Invalid value for property '{prop.name}' of type {prop.property_type}",
                     )
 
             return (True, None)
@@ -851,148 +875,551 @@ class DatabaseEntryService:
         property_type: str,
         value: Any,
         config: Optional[Dict] = None,
-    ) -> bool:
+        property_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
         """
-        Validate value against property type.
+        Validate value against property type with detailed error messages.
 
         Args:
             property_type: Type of property
             value: Value to validate
             config: Optional property configuration
+            property_name: Optional property name for error messages
 
         Returns:
-            True if valid, False otherwise
+            Tuple of (is_valid, error_message)
         """
         if value is None:
-            return True
+            return True, None
 
+        # Handle both dict format and plain values
         if not isinstance(value, dict):
-            return False
+            # Try to convert plain value to dict format
+            return self._convert_and_validate(property_type, value, config, property_name)
 
         # Validate based on property type
         if property_type == "text":
-            if "text" not in value:
-                return False
-            text = value["text"]
-            if not isinstance(text, str):
-                return False
-            # Max length 5000
-            if len(text) > 5000:
-                return False
-            return True
+            return self._validate_text_value(value, config, property_name)
 
         elif property_type == "number":
-            if "number" not in value:
-                return False
-            return isinstance(value["number"], (int, float))
+            return self._validate_number_value(value, config, property_name)
 
         elif property_type == "select":
-            if "select" not in value:
-                return False
-            if value["select"] is None:
-                return True
-            if not isinstance(value["select"], dict):
-                return False
-            # Check if value is in options (if config provided)
-            if config and "options" in config:
-                option_names = [opt["name"] for opt in config["options"]]
-                return value["select"].get("name") in option_names
-            return True
+            return self._validate_select_value(value, config, property_name)
 
         elif property_type == "multiselect":
-            if "multiselect" not in value:
-                return False
-            if not isinstance(value["multiselect"], list):
-                return False
-            # Check all values are in options (if config provided)
-            if config and "options" in config:
-                option_names = [opt["name"] for opt in config["options"]]
-                for item in value["multiselect"]:
-                    if not isinstance(item, dict) or item.get("name") not in option_names:
-                        return False
-            return True
+            return self._validate_multiselect_value(value, config, property_name)
 
         elif property_type == "date":
-            if "date" not in value:
-                return False
-            date_val = value["date"]
-            if not isinstance(date_val, dict):
-                return False
-            # Should have "start" and optionally "end" for date range
-            if "start" not in date_val:
-                return False
-            # Validate ISO date format
-            try:
-                from datetime import datetime
-
-                datetime.fromisoformat(date_val["start"].replace("Z", "+00:00"))
-                if "end" in date_val:
-                    datetime.fromisoformat(date_val["end"].replace("Z", "+00:00"))
-            except (ValueError, AttributeError):
-                return False
-            return True
+            return self._validate_date_value(value, config, property_name)
 
         elif property_type == "checkbox":
-            if "checkbox" not in value:
-                return False
-            return isinstance(value["checkbox"], bool)
+            return self._validate_checkbox_value(value, config, property_name)
 
         elif property_type == "url":
-            if "url" not in value:
-                return False
-            url = value["url"]
-            if not isinstance(url, str):
-                return False
-            # Basic URL validation
-            url_pattern = re.compile(
-                r"^https?://"  # http:// or https://
-                r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|"  # domain...
-                r"localhost|"  # localhost...
-                r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"  # ...or ip
-                r"(?::\d+)?"  # optional port
-                r"(?:/?|[/?]\S+)$",
-                re.IGNORECASE,
-            )
-            return bool(url_pattern.match(url))
+            return self._validate_url_value(value, config, property_name)
 
         elif property_type == "email":
-            if "email" not in value:
-                return False
-            email = value["email"]
-            if not isinstance(email, str):
-                return False
-            # Basic email validation
-            email_pattern = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
-            return bool(email_pattern.match(email))
+            return self._validate_email_value(value, config, property_name)
 
         elif property_type == "phone":
-            if "phone" not in value:
-                return False
-            phone = value["phone"]
-            if not isinstance(phone, str):
-                return False
-            # Basic phone validation (flexible format)
-            # Allows: +1234567890, (123) 456-7890, 123-456-7890, etc.
-            phone_clean = re.sub(r"[^\d]", "", phone)
-            return len(phone_clean) >= 10 and len(phone_clean) <= 15
+            return self._validate_phone_value(value, config, property_name)
 
         elif property_type == "relation":
-            if "relations" not in value:
-                return False
-            relations = value["relations"]
-            if not isinstance(relations, list):
-                return False
-            # Each relation should be a UUID string
-            for rel in relations:
-                try:
-                    UUID(rel)
-                except (ValueError, TypeError):
-                    return False
-            return True
+            return self._validate_relation_value(value, config, property_name)
 
         # Auto-populated fields are always valid
-        elif property_type in ["created_time", "created_by", "last_edited_time", "last_edited_by"]:
-            return True
+        elif property_type in [
+            "created_time",
+            "created_by",
+            "last_edited_time",
+            "last_edited_by",
+        ]:
+            return True, None
 
         # Unknown type
-        return False
+        return False, f"Unknown property type: {property_type}"
+
+    def _convert_and_validate(
+        self,
+        property_type: str,
+        value: Any,
+        config: Optional[Dict] = None,
+        property_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Convert plain value to dict format and validate.
+
+        Args:
+            property_type: Type of property
+            value: Plain value to convert and validate
+            config: Optional property configuration
+            property_name: Optional property name for error messages
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        try:
+            if property_type == "text":
+                # Accept anything convertible to string
+                try:
+                    text_str = str(value).strip() if value is not None else ""
+                    converted = {"text": text_str}
+                    return self._validate_text_value(converted, config, property_name)
+                except Exception:
+                    prop_display = f"'{property_name}'" if property_name else "Text"
+                    return False, f"{prop_display} value must be convertible to string"
+
+            elif property_type == "number":
+                # Try to convert to number
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    converted = {"number": value}
+                    return self._validate_number_value(converted, config, property_name)
+                # Try to convert string to number
+                if isinstance(value, str):
+                    value_stripped = value.strip()
+                    if not value_stripped:
+                        return True, None  # Empty is ok for optional
+                    try:
+                        # Try int first, then float
+                        try:
+                            num = int(value_stripped)
+                        except ValueError:
+                            num = float(value_stripped)
+                        converted = {"number": num}
+                        return self._validate_number_value(converted, config, property_name)
+                    except ValueError:
+                        prop_display = f"'{property_name}'" if property_name else "Number"
+                        return (
+                            False,
+                            f"{prop_display}: Cannot convert '{value}' to number",
+                        )
+                prop_display = f"'{property_name}'" if property_name else "Number"
+                return False, f"{prop_display} expects a numeric value"
+
+            elif property_type == "checkbox":
+                # Convert to bool
+                if isinstance(value, bool):
+                    converted = {"checkbox": value}
+                    return self._validate_checkbox_value(converted, config, property_name)
+                # Try to convert string or int to bool
+                if isinstance(value, (str, int)):
+                    if isinstance(value, str):
+                        lowered = value.lower().strip()
+                        if lowered in ["true", "1", "yes", "on"]:
+                            converted = {"checkbox": True}
+                            return self._validate_checkbox_value(converted, config, property_name)
+                        elif lowered in ["false", "0", "no", "off", ""]:
+                            converted = {"checkbox": False}
+                            return self._validate_checkbox_value(converted, config, property_name)
+                    elif value == 1:
+                        converted = {"checkbox": True}
+                        return self._validate_checkbox_value(converted, config, property_name)
+                    elif value == 0:
+                        converted = {"checkbox": False}
+                        return self._validate_checkbox_value(converted, config, property_name)
+                prop_display = f"'{property_name}'" if property_name else "Checkbox"
+                return False, f"{prop_display} expects a boolean value"
+
+            elif property_type in ["url", "email", "phone"]:
+                # Convert to string
+                try:
+                    str_val = str(value).strip() if value is not None else ""
+                    converted = {property_type: str_val}
+                    return self._validate_value_for_type(
+                        property_type, converted, config, property_name
+                    )
+                except Exception:
+                    prop_display = f"'{property_name}'" if property_name else property_type.title()
+                    return False, f"{prop_display} value must be a string"
+
+            prop_display = f"'{property_name}'" if property_name else property_type.title()
+            return False, f"Invalid value format for {prop_display}"
+
+        except Exception as e:
+            logger.error(f"Error converting value for {property_type}: {e}")
+            prop_display = f"'{property_name}'" if property_name else property_type.title()
+            return False, f"Failed to process {prop_display} value"
+
+    def _validate_text_value(
+        self,
+        value: Dict[str, Any],
+        config: Optional[Dict] = None,
+        property_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """Validate text property value."""
+        if "text" not in value:
+            prop_display = f"'{property_name}'" if property_name else "Text"
+            return False, f"{prop_display} must have 'text' field"
+
+        text = value["text"]
+
+        # Accept None for optional fields
+        if text is None:
+            return True, None
+
+        # Try to convert to string
+        try:
+            text_str = str(text).strip()
+        except Exception:
+            prop_display = f"'{property_name}'" if property_name else "Text"
+            return False, f"{prop_display} value must be convertible to string"
+
+        # Max length 5000
+        if len(text_str) > 5000:
+            prop_display = f"'{property_name}'" if property_name else "Text"
+            return (
+                False,
+                f"{prop_display} exceeds maximum length of 5000 characters",
+            )
+
+        return True, None
+
+    def _validate_number_value(
+        self,
+        value: Dict[str, Any],
+        config: Optional[Dict] = None,
+        property_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """Validate number property value."""
+        if "number" not in value:
+            prop_display = f"'{property_name}'" if property_name else "Number"
+            return False, f"{prop_display} must have 'number' field"
+
+        num = value["number"]
+
+        # Accept None for optional fields
+        if num is None:
+            return True, None
+
+        # Try to convert to number if needed
+        if isinstance(num, (int, float)):
+            return True, None
+
+        # Try to parse string as number
+        if isinstance(num, str):
+            try:
+                # Try int first
+                int(num)
+                return True, None
+            except ValueError:
+                try:
+                    # Try float
+                    float(num)
+                    return True, None
+                except ValueError:
+                    prop_display = f"'{property_name}'" if property_name else "Number"
+                    return (
+                        False,
+                        f"{prop_display} value '{num}' cannot be converted to number",
+                    )
+
+        prop_display = f"'{property_name}'" if property_name else "Number"
+        return False, f"{prop_display} value must be numeric"
+
+    def _validate_select_value(
+        self,
+        value: Dict[str, Any],
+        config: Optional[Dict] = None,
+        property_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """Validate select property value."""
+        if "select" not in value:
+            prop_display = f"'{property_name}'" if property_name else "Select"
+            return False, f"{prop_display} must have 'select' field"
+
+        select_val = value["select"]
+        if select_val is None:
+            return True, None  # Empty select is valid
+
+        if not isinstance(select_val, dict):
+            prop_display = f"'{property_name}'" if property_name else "Select"
+            return False, f"{prop_display} value must be an object"
+
+        if "name" not in select_val:
+            prop_display = f"'{property_name}'" if property_name else "Select"
+            return False, f"{prop_display} option must have 'name' field"
+
+        # Check if value is in options (case-insensitive if config provided)
+        if config and "options" in config:
+            option_names = [opt["name"].lower() for opt in config["options"]]
+            select_name = str(select_val.get("name", "")).lower().strip()
+
+            if select_name and select_name not in option_names:
+                # Be lenient - only fail if the option list is not empty
+                if option_names:
+                    available = ", ".join([opt["name"] for opt in config["options"]])
+                    prop_display = f"'{property_name}'" if property_name else "Select"
+                    return (
+                        False,
+                        f"{prop_display}: '{select_val.get('name')}' is not valid. "
+                        f"Available: {available}",
+                    )
+
+        return True, None
+
+    def _validate_multiselect_value(
+        self,
+        value: Dict[str, Any],
+        config: Optional[Dict] = None,
+        property_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """Validate multiselect property value."""
+        if "multiselect" not in value:
+            return False, "Multiselect property must have 'multiselect' field"
+
+        multiselect_val = value["multiselect"]
+        if not isinstance(multiselect_val, list):
+            return False, "Multiselect value must be an array"
+
+        # Check all values are in options (if config provided)
+        if config and "options" in config:
+            option_names = [opt["name"].lower() for opt in config["options"]]
+            for item in multiselect_val:
+                if not isinstance(item, dict) or "name" not in item:
+                    return False, "Each multiselect option must be an object with 'name' field"
+                item_name = item.get("name", "").lower()
+                if item_name not in option_names:
+                    available = ", ".join([opt["name"] for opt in config["options"]])
+                    return (
+                        False,
+                        f"'{item.get('name')}' is not a valid option. "
+                        f"Available options: {available}",
+                    )
+
+        return True, None
+
+    def _validate_date_value(
+        self,
+        value: Dict[str, Any],
+        config: Optional[Dict] = None,
+        property_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """Validate date property value."""
+        if "date" not in value:
+            return False, "Date property must have 'date' field"
+
+        date_val = value["date"]
+        if not isinstance(date_val, dict):
+            return False, "Date value must be an object"
+
+        # Should have "start" and optionally "end" for date range
+        if "start" not in date_val:
+            return False, "Date must have 'start' field"
+
+        # Validate ISO date format (support multiple formats)
+        start_date = date_val["start"]
+        if not isinstance(start_date, str):
+            return False, "Date start must be a string"
+
+        if not self._is_valid_date_string(start_date):
+            return (
+                False,
+                f"Invalid date format: '{start_date}'. "
+                f"Expected ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)",
+            )
+
+        if "end" in date_val:
+            end_date = date_val["end"]
+            if not isinstance(end_date, str):
+                return False, "Date end must be a string"
+            if not self._is_valid_date_string(end_date):
+                return (
+                    False,
+                    f"Invalid date format: '{end_date}'. "
+                    f"Expected ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)",
+                )
+
+        return True, None
+
+    def _is_valid_date_string(self, date_str: str) -> bool:
+        """Check if string is a valid date in multiple ISO formats."""
+        try:
+            from datetime import datetime
+
+            # Try different ISO formats
+            formats = [
+                "%Y-%m-%dT%H:%M:%S",
+                "%Y-%m-%dT%H:%M:%S.%f",
+                "%Y-%m-%d",
+                "%Y-%m-%dT%H:%M:%SZ",
+                "%Y-%m-%dT%H:%M:%S.%fZ",
+            ]
+
+            # Handle Z timezone indicator
+            cleaned = date_str.replace("Z", "+00:00")
+
+            # Try direct ISO parsing first
+            try:
+                datetime.fromisoformat(cleaned)
+                return True
+            except ValueError:
+                pass
+
+            # Try specific formats
+            for fmt in formats:
+                try:
+                    datetime.strptime(date_str, fmt)
+                    return True
+                except ValueError:
+                    continue
+
+            return False
+        except Exception:
+            return False
+
+    def _validate_checkbox_value(
+        self,
+        value: Dict[str, Any],
+        config: Optional[Dict] = None,
+        property_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """Validate checkbox property value."""
+        if "checkbox" not in value:
+            return False, "Checkbox property must have 'checkbox' field"
+
+        checkbox_val = value["checkbox"]
+        if not isinstance(checkbox_val, bool):
+            return False, "Checkbox value must be true or false"
+
+        return True, None
+
+    def _validate_url_value(
+        self,
+        value: Dict[str, Any],
+        config: Optional[Dict] = None,
+        property_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """Validate URL property value."""
+        if "url" not in value:
+            prop_display = f"'{property_name}'" if property_name else "URL"
+            return False, f"{prop_display} must have 'url' field"
+
+        url = value["url"]
+
+        # Allow None
+        if url is None:
+            return True, None
+
+        # Try to convert to string
+        try:
+            url_str = str(url).strip()
+        except Exception:
+            prop_display = f"'{property_name}'" if property_name else "URL"
+            return False, f"{prop_display} value must be a string"
+
+        # Allow empty URLs
+        if not url_str:
+            return True, None
+
+        # Basic URL validation (permissive - just check for protocol)
+        valid_protocols = ["http://", "https://", "ftp://"]
+        if not any(url_str.lower().startswith(p) for p in valid_protocols):
+            prop_display = f"'{property_name}'" if property_name else "URL"
+            return (
+                False,
+                f"{prop_display} must start with http://, https://, or ftp://",
+            )
+
+        return True, None
+
+    def _validate_email_value(
+        self,
+        value: Dict[str, Any],
+        config: Optional[Dict] = None,
+        property_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """Validate email property value."""
+        if "email" not in value:
+            prop_display = f"'{property_name}'" if property_name else "Email"
+            return False, f"{prop_display} must have 'email' field"
+
+        email = value["email"]
+
+        # Allow None
+        if email is None:
+            return True, None
+
+        # Try to convert to string
+        try:
+            email_str = str(email).strip()
+        except Exception:
+            prop_display = f"'{property_name}'" if property_name else "Email"
+            return False, f"{prop_display} value must be a string"
+
+        # Allow empty emails
+        if not email_str:
+            return True, None
+
+        # Basic email validation - just check for @ and domain
+        if "@" not in email_str:
+            prop_display = f"'{property_name}'" if property_name else "Email"
+            return False, f"{prop_display} must contain '@' symbol"
+
+        # Very basic validation - has @ and something after it
+        parts = email_str.split("@")
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            prop_display = f"'{property_name}'" if property_name else "Email"
+            return False, f"{prop_display} format invalid: '{email_str}'"
+
+        return True, None
+
+    def _validate_phone_value(
+        self,
+        value: Dict[str, Any],
+        config: Optional[Dict] = None,
+        property_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """Validate phone property value."""
+        if "phone" not in value:
+            prop_display = f"'{property_name}'" if property_name else "Phone"
+            return False, f"{prop_display} must have 'phone' field"
+
+        phone = value["phone"]
+
+        # Allow None
+        if phone is None:
+            return True, None
+
+        # Try to convert to string
+        try:
+            phone_str = str(phone).strip()
+        except Exception:
+            prop_display = f"'{property_name}'" if property_name else "Phone"
+            return False, f"{prop_display} value must be a string"
+
+        # Allow empty phones
+        if not phone_str:
+            return True, None
+
+        # Very permissive - just accept any string
+        # International formats vary too much to validate strictly
+        # Just check it's not too long
+        if len(phone_str) > 50:
+            prop_display = f"'{property_name}'" if property_name else "Phone"
+            return False, f"{prop_display} exceeds maximum length of 50 characters"
+
+        return True, None
+
+    def _validate_relation_value(
+        self,
+        value: Dict[str, Any],
+        config: Optional[Dict] = None,
+        property_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """Validate relation property value."""
+        if "relations" not in value:
+            return False, "Relation property must have 'relations' field"
+
+        relations = value["relations"]
+        if not isinstance(relations, list):
+            return False, "Relations value must be an array"
+
+        # Each relation should be a UUID string
+        for rel in relations:
+            try:
+                UUID(str(rel))
+            except (ValueError, TypeError):
+                return False, f"Invalid relation ID: '{rel}'. Must be a valid UUID."
+
+        return True, None
