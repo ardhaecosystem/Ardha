@@ -10,15 +10,14 @@ This module tests the notification REST API and WebSocket endpoints including:
 - Real-time WebSocket notifications
 """
 
+from uuid import uuid4
+
 import pytest
 from httpx import AsyncClient
 from starlette.testclient import TestClient
-from uuid import uuid4
 
-from ardha.models.user import User
 from ardha.models.notification import Notification
 from ardha.models.notification_preference import NotificationPreference
-
 
 # ============= Test Notification List =============
 
@@ -664,6 +663,7 @@ class TestWebSocketNotifications:
     ):
         """Test successful WebSocket connection."""
         from unittest.mock import patch
+
         from ardha.main import app
 
         # Mock decode_token to avoid database operations
@@ -692,6 +692,7 @@ class TestWebSocketNotifications:
     def test_websocket_connect_invalid_token(self):
         """Test WebSocket connection with invalid token."""
         from unittest.mock import patch
+
         from ardha.main import app
 
         # Mock decode_token to raise an error
@@ -720,6 +721,7 @@ class TestWebSocketNotifications:
     ):
         """Test ping/pong keepalive mechanism."""
         from unittest.mock import patch
+
         from ardha.main import app
 
         # Mock decode_token to avoid database operations
@@ -753,6 +755,7 @@ class TestWebSocketNotifications:
     ):
         """Test WebSocket disconnection and cleanup."""
         from unittest.mock import patch
+
         from ardha.main import app
 
         # Mock decode_token to avoid database operations

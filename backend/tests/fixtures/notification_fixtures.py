@@ -8,18 +8,16 @@ This module provides reusable test fixtures for notification API testing includi
 - WebSocket test utilities
 """
 
-import pytest
-import pytest_asyncio
 from datetime import datetime, timezone
 from typing import Dict, List
 from uuid import uuid4
 
+import pytest
+import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ardha.models.notification import Notification
 from ardha.models.notification_preference import NotificationPreference
-from ardha.models.user import User
-
 
 # ============= Notification Fixtures =============
 
@@ -40,9 +38,9 @@ async def test_notification(
         Notification instance with standard test data
     """
     from uuid import UUID
-    
+
     user_id = UUID(test_user["user"]["id"])
-    
+
     notification = Notification(
         id=uuid4(),
         user_id=user_id,
@@ -83,7 +81,7 @@ async def test_notifications_batch(
         List of 5 Notification instances
     """
     from uuid import UUID
-    
+
     user_id = UUID(test_user["user"]["id"])
     notifications = []
 
@@ -143,9 +141,9 @@ async def test_notification_preferences(
         NotificationPreference instance with default settings
     """
     from uuid import UUID
-    
+
     user_id = UUID(test_user["user"]["id"])
-    
+
     preferences = NotificationPreference(
         id=uuid4(),
         user_id=user_id,
@@ -190,7 +188,7 @@ async def test_unread_notifications(
         List of 3 unread Notification instances
     """
     from uuid import UUID
-    
+
     user_id = UUID(test_user["user"]["id"])
     notifications = []
 
@@ -234,7 +232,7 @@ async def test_read_notifications(
         List of 2 read Notification instances
     """
     from uuid import UUID
-    
+
     user_id = UUID(test_user["user"]["id"])
     notifications = []
 

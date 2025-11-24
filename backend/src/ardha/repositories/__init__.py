@@ -16,9 +16,7 @@ from ardha.repositories.git_commit import GitCommitRepository
 from ardha.repositories.github_integration import GitHubIntegrationRepository
 from ardha.repositories.message_repository import MessageRepository
 from ardha.repositories.milestone_repository import MilestoneRepository
-from ardha.repositories.notification_preference_repository import (
-    NotificationPreferenceRepository,
-)
+from ardha.repositories.notification_preference_repository import NotificationPreferenceRepository
 from ardha.repositories.notification_repository import NotificationRepository
 from ardha.repositories.openspec import OpenSpecRepository
 from ardha.repositories.project_repository import ProjectRepository

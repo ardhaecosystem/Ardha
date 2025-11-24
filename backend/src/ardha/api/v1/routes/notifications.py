@@ -19,9 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ardha.core.database import get_db
 from ardha.core.security import get_current_user
 from ardha.models.user import User
-from ardha.schemas.requests.notification import (
-    NotificationPreferenceUpdateRequest,
-)
+from ardha.schemas.requests.notification import NotificationPreferenceUpdateRequest
 from ardha.schemas.responses.notification import (
     NotificationListResponse,
     NotificationPreferenceResponse,
@@ -284,9 +282,7 @@ async def get_notification_stats(
         recent_notifications = []
         for notif_data in stats["recent_notifications"]:
             # Get full notification from database for complete data
-            from ardha.repositories.notification_repository import (
-                NotificationRepository,
-            )
+            from ardha.repositories.notification_repository import NotificationRepository
 
             repo = NotificationRepository(db)
             notif = await repo.get_by_id(UUID(notif_data["id"]))

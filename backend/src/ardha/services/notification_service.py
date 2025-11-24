@@ -20,9 +20,7 @@ from ardha.core.email_service import EmailService
 from ardha.core.websocket_manager import get_websocket_manager
 from ardha.models.notification import Notification
 from ardha.models.notification_preference import NotificationPreference
-from ardha.repositories.notification_preference_repository import (
-    NotificationPreferenceRepository,
-)
+from ardha.repositories.notification_preference_repository import NotificationPreferenceRepository
 from ardha.repositories.notification_repository import NotificationRepository
 from ardha.repositories.user_repository import UserRepository
 
