@@ -1,270 +1,127 @@
 """
-WebSocket routes for real-time chat streaming.
+WebSocket API routes for real-time notifications.
 
-This module provides WebSocket endpoints for real-time chat interactions,
-including authentication, message handling, and streaming responses.
+This module provides WebSocket endpoints for real-time communication including:
+- Real-time notification delivery
+- Ping/pong keepalive mechanism
+- JWT token authentication
+- Connection management and cleanup
 """
 
-import json
 import logging
-from typing import Dict, Optional, Set
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ardha.core.database import get_db
-from ardha.core.security import verify_token
-from ardha.models.user import User
-from ardha.services.chat_service import (
-    ChatBudgetExceededError,
-    ChatNotFoundError,
-    ChatService,
-    InsufficientChatPermissionsError,
-)
+from ardha.core.security import decode_token
+from ardha.core.websocket_manager import get_websocket_manager
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
-
-# Store active WebSocket connections
-active_connections: Dict[UUID, Set[WebSocket]] = {}
+router = APIRouter(prefix="/ws", tags=["websocket"])
 
 
-class WebSocketManager:
-    """Manages WebSocket connections for chat rooms."""
-
-    @staticmethod
-    async def connect(websocket: WebSocket, chat_id: UUID) -> None:
-        """Connect a WebSocket to a chat room."""
-        await websocket.accept()
-
-        if chat_id not in active_connections:
-            active_connections[chat_id] = set()
-
-        active_connections[chat_id].add(websocket)
-        logger.info(
-            f"WebSocket connected to chat {chat_id}. Total connections: {len(active_connections[chat_id])}"
-        )
-
-    @staticmethod
-    async def disconnect(websocket: WebSocket, chat_id: UUID) -> None:
-        """Disconnect a WebSocket from a chat room."""
-        if chat_id in active_connections:
-            active_connections[chat_id].discard(websocket)
-
-            # Clean up empty chat rooms
-            if not active_connections[chat_id]:
-                del active_connections[chat_id]
-
-        logger.info(f"WebSocket disconnected from chat {chat_id}")
-
-    @staticmethod
-    async def send_personal_message(message: str, websocket: WebSocket) -> None:
-        """Send a message to a specific WebSocket."""
-        try:
-            await websocket.send_text(message)
-        except Exception as e:
-            logger.error(f"Error sending personal message: {e}")
-
-    @staticmethod
-    async def broadcast_to_chat(
-        message: str, chat_id: UUID, exclude_websocket: Optional[WebSocket] = None
-    ) -> None:
-        """Broadcast a message to all connections in a chat room."""
-        if chat_id not in active_connections:
-            return
-
-        disconnected = set()
-        for connection in active_connections[chat_id]:
-            if connection == exclude_websocket:
-                continue
-
-            try:
-                await connection.send_text(message)
-            except Exception as e:
-                logger.error(f"Error broadcasting to connection: {e}")
-                disconnected.add(connection)
-
-        # Remove disconnected connections
-        for connection in disconnected:
-            active_connections[chat_id].discard(connection)
+# ============= WebSocket Endpoints =============
 
 
-@router.websocket("/chats/{chat_id}/ws")
-async def chat_websocket(
+@router.websocket("/notifications")
+async def notification_websocket(
     websocket: WebSocket,
-    chat_id: UUID,
     token: str = Query(..., description="JWT authentication token"),
     db: AsyncSession = Depends(get_db),
-) -> None:
+):
     """
-    WebSocket endpoint for real-time chat streaming.
+    WebSocket endpoint for real-time notifications.
 
-    Provides real-time bidirectional communication for chat sessions.
-    Authenticates via JWT token query parameter.
+    Authentication:
+        token: JWT token as query parameter (e.g., ?token=eyJ...)
+
+    Message Types Received:
+        - {"type": "ping"} → responds with {"type": "pong"}
+
+    Message Types Sent:
+        - {"type": "notification", "data": {...}} - New notification
+        - {"type": "system", "data": {...}} - System message
+        - {"type": "error", "data": {...}} - Error message
+
+    Connection Flow:
+        1. Validate JWT token
+        2. Accept WebSocket connection
+        3. Register with WebSocketManager
+        4. Listen for incoming messages
+        5. Handle ping/pong for keepalive
+        6. Disconnect and cleanup on close
 
     Args:
-        websocket: WebSocket connection instance
-        chat_id: UUID of chat to connect to
+        websocket: FastAPI WebSocket connection
         token: JWT authentication token
-        db: Database session
-
-    WebSocket Messages:
-        Receive: {"type": "message", "content": "...", "model": "..."}
-        Send: {"type": "chunk", "content": "..."}
-        Send: {"type": "done", "message_id": "...", "tokens": ..., "cost": ...}
-        Send: {"type": "error", "message": "..."}
+        db: Database session (for future use if needed)
 
     Raises:
-        403: Invalid token or insufficient permissions
-        404: Chat not found
-        500: Server error
+        WebSocketDisconnect: When connection is closed
     """
-    logger.info(f"WebSocket connection attempt to chat {chat_id}")
+    ws_manager = get_websocket_manager()
+    user_id = None
 
     try:
-        # Authenticate token
-        payload = verify_token(token)
-        if not payload:
-            await websocket.close(code=4003, reason="Invalid authentication token")
-            return
-
-        # Initialize chat service
-        chat_service = ChatService(db)
-
-        # Extract user ID from token
+        # Step 1: Validate JWT token
         try:
-            from uuid import UUID
-
+            payload = decode_token(token)
             user_id = UUID(payload.get("sub"))
-        except (ValueError, TypeError):
-            await websocket.close(code=4003, reason="Invalid token format")
+
+            if not user_id:
+                await websocket.close(code=1008, reason="Invalid token: missing user ID")
+                return
+
+        except Exception as e:
+            logger.warning(f"WebSocket authentication failed: {e}")
+            await websocket.close(code=1008, reason="Authentication failed")
             return
 
-        # Verify chat exists and user has access
-        chat = await chat_service.chat_repo.get_by_id(chat_id)
-        if not chat:
-            await websocket.close(code=4004, reason="Chat not found")
-            return
+        # Step 2-3: Accept connection and register with manager
+        await ws_manager.connect(websocket, user_id)
 
-        if chat.user_id != user_id:
-            await websocket.close(code=4003, reason="Insufficient permissions")
-            return
+        logger.info(f"User {user_id} connected to notification WebSocket")
 
-        # Connect to chat room
-        await WebSocketManager.connect(websocket, chat_id)
-
+        # Step 4: Listen for messages
         try:
             while True:
                 # Receive message from client
-                data = await websocket.receive_text()
+                data = await websocket.receive_json()
 
-                try:
-                    message = json.loads(data)
-                    message_type = message.get("type")
+                # Handle ping/pong for keepalive
+                if data.get("type") == "ping":
+                    await websocket.send_json({"type": "pong"})
+                    logger.debug(f"Responded to ping from user {user_id}")
 
-                    if message_type == "message":
-                        content = message.get("content", "").strip()
-                        model = message.get("model", "").strip()
-
-                        # Validate message
-                        if not content:
-                            error_msg = json.dumps(
-                                {"type": "error", "message": "Message content cannot be empty"}
-                            )
-                            await WebSocketManager.send_personal_message(error_msg, websocket)
-                            continue
-
-                        if not model:
-                            error_msg = json.dumps(
-                                {"type": "error", "message": "Model is required"}
-                            )
-                            await WebSocketManager.send_personal_message(error_msg, websocket)
-                            continue
-
-                        # Send user message confirmation
-                        confirmation = json.dumps(
-                            {
-                                "type": "message_received",
-                                "content": content,
-                                "timestamp": str(
-                                    websocket.scope.get("state", {}).get("receive_time", "")
-                                ),
-                            }
-                        )
-                        await WebSocketManager.send_personal_message(confirmation, websocket)
-
-                        # Stream AI response
-                        try:
-                            full_response = ""
-                            message_id = None
-                            total_tokens = 0
-                            total_cost = 0.0
-
-                            async for chunk in chat_service.send_message(
-                                chat_id=chat_id,
-                                user_id=user_id,
-                                content=content,
-                                model=model,
-                            ):
-                                # Send chunk to all connections in chat room
-                                chunk_msg = json.dumps({"type": "chunk", "content": chunk})
-                                await WebSocketManager.broadcast_to_chat(
-                                    chunk_msg, chat_id, websocket
-                                )
-                                full_response += chunk
-
-                            # Send completion message
-                            completion_msg = json.dumps(
-                                {
-                                    "type": "done",
-                                    "message_id": str(message_id) if message_id else None,
-                                    "tokens": total_tokens,
-                                    "cost": total_cost,
-                                }
-                            )
-                            await WebSocketManager.broadcast_to_chat(completion_msg, chat_id)
-
-                        except (ChatNotFoundError, InsufficientChatPermissionsError) as e:
-                            error_msg = json.dumps({"type": "error", "message": str(e)})
-                            await WebSocketManager.send_personal_message(error_msg, websocket)
-
-                        except ChatBudgetExceededError as e:
-                            error_msg = json.dumps({"type": "error", "message": str(e)})
-                            await WebSocketManager.send_personal_message(error_msg, websocket)
-
-                        except Exception as e:
-                            logger.error(f"Error processing message: {e}", exc_info=True)
-                            error_msg = json.dumps(
-                                {"type": "error", "message": "Internal server error"}
-                            )
-                            await WebSocketManager.send_personal_message(error_msg, websocket)
-
-                    else:
-                        # Unknown message type
-                        error_msg = json.dumps(
-                            {"type": "error", "message": f"Unknown message type: {message_type}"}
-                        )
-                        await WebSocketManager.send_personal_message(error_msg, websocket)
-
-                except json.JSONDecodeError:
-                    error_msg = json.dumps({"type": "error", "message": "Invalid JSON format"})
-                    await WebSocketManager.send_personal_message(error_msg, websocket)
-
-                except Exception as e:
-                    logger.error(f"Error processing WebSocket message: {e}", exc_info=True)
-                    error_msg = json.dumps({"type": "error", "message": "Error processing message"})
-                    await WebSocketManager.send_personal_message(error_msg, websocket)
+                # Log any other message types (for debugging)
+                else:
+                    logger.debug(f"Received message from user {user_id}: {data.get('type')}")
 
         except WebSocketDisconnect:
-            logger.info(f"WebSocket disconnected from chat {chat_id}")
-        finally:
-            await WebSocketManager.disconnect(websocket, chat_id)
+            logger.info(f"User {user_id} disconnected from notification WebSocket")
 
     except Exception as e:
-        logger.error(f"WebSocket error for chat {chat_id}: {e}", exc_info=True)
+        logger.error(f"WebSocket error for user {user_id}: {e}", exc_info=True)
+
+        # Try to send error message if connection still open
         try:
-            await websocket.close(code=5000, reason="Internal server error")
-        except:
-            pass
+            await websocket.send_json(
+                {
+                    "type": "error",
+                    "data": {
+                        "message": "An error occurred",
+                        "details": str(e),
+                    },
+                }
+            )
+        except Exception:
+            pass  # Connection likely already closed
+
+    finally:
+        # Step 6: Cleanup
+        if user_id:
+            await ws_manager.disconnect(websocket, user_id)
+            logger.info(f"Cleaned up WebSocket connection for user {user_id}")

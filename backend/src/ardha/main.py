@@ -15,6 +15,7 @@ from ardha.api.v1.routes import (
     github,
     memories,
     milestones,
+    notifications,
     oauth,
     openspec,
     projects,
@@ -60,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(github.router, prefix="/api/v1")  # GitHub integration routes
     app.include_router(chats.router, prefix="/api/v1")
     app.include_router(memories.router, prefix="/api/v1")
+    app.include_router(notifications.router, prefix="/api/v1")
     app.include_router(openspec.router, prefix="/api/v1")
     app.include_router(websocket.router, prefix="/api/v1")
     app.include_router(task_generation.router, prefix="/api/v1")

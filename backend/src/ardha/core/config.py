@@ -100,11 +100,15 @@ class AISettings(BaseModel):
 class EmailSettings(BaseModel):
     """Email configuration settings."""
 
-    host: Optional[str] = Field(default=None, description="SMTP server host")
-    port: int = Field(default=587, ge=1, le=65535, description="SMTP server port")
-    user: Optional[str] = Field(default=None, description="SMTP username")
-    password: Optional[str] = Field(default=None, description="SMTP password")
-    tls: bool = Field(default=True, description="Whether to use TLS for SMTP")
+    smtp_host: str = Field(default="smtp.gmail.com", description="SMTP server host")
+    smtp_port: int = Field(default=587, ge=1, le=65535, description="SMTP server port")
+    smtp_username: Optional[str] = Field(default=None, description="SMTP username")
+    smtp_password: Optional[str] = Field(default=None, description="SMTP password")
+    use_tls: bool = Field(default=True, description="Whether to use TLS for SMTP")
+    from_email: str = Field(
+        default="noreply@ardha.dev", description="From email address for notifications"
+    )
+    from_name: str = Field(default="Ardha", description="From name for notification emails")
 
 
 class OAuthSettings(BaseModel):

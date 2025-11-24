@@ -19,6 +19,8 @@ from ardha.models.github_webhook import GitHubWebhookDelivery
 from ardha.models.memory import Memory, MemoryLink
 from ardha.models.message import Message
 from ardha.models.milestone import Milestone
+from ardha.models.notification import Notification
+from ardha.models.notification_preference import NotificationPreference
 from ardha.models.openspec import OpenSpecProposal
 from ardha.models.project import Project
 from ardha.models.project_member import ProjectMember
@@ -58,4 +60,6 @@ __all__ = [
     "DatabaseView",
     "DatabaseEntry",
     "DatabaseEntryValue",
+    "Notification",
+    "NotificationPreference",
 ]

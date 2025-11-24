@@ -25,6 +25,8 @@ if TYPE_CHECKING:
     from ardha.models.git_commit import GitCommit
     from ardha.models.github_integration import PullRequest
     from ardha.models.memory import Memory
+    from ardha.models.notification import Notification
+    from ardha.models.notification_preference import NotificationPreference
     from ardha.models.openspec import OpenSpecProposal
     from ardha.models.project import Project
     from ardha.models.project_member import ProjectMember
@@ -179,6 +181,21 @@ class User(Base, BaseModel):
         "DatabaseView",
         foreign_keys="DatabaseView.created_by_user_id",
         back_populates="created_by",
+        lazy="select",
+    )
+
+    notifications: Mapped[list["Notification"]] = relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    notification_preferences: Mapped["NotificationPreference | None"] = relationship(
+        "NotificationPreference",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
         lazy="select",
     )
 

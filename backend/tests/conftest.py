@@ -47,6 +47,18 @@ from tests.fixtures.job_fixtures import (  # noqa: F401
     test_projects_with_tasks,
 )
 
+# Import Notification fixtures (used by pytest fixture discovery)
+from tests.fixtures.notification_fixtures import (  # noqa: F401
+    mock_email_service,
+    notification_service,
+    test_notification,
+    test_notification_preferences,
+    test_notifications_batch,
+    test_read_notifications,
+    test_unread_notifications,
+    websocket_client,
+)
+
 # Test database URL (separate from development database)
 TEST_DATABASE_URL = "postgresql+asyncpg://ardha_user:ardha_password@localhost:5432/ardha_test"
 
