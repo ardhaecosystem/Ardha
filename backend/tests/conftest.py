@@ -37,6 +37,16 @@ from tests.fixtures.github_fixtures import (  # noqa: F401
 )
 from tests.fixtures.github_fixtures import sample_pull_request as github_sample_pull_request
 
+# Import Job fixtures (used by pytest fixture discovery)
+from tests.fixtures.job_fixtures import (  # noqa: F401
+    test_ai_usage_week,
+    test_ai_usage_yesterday,
+    test_commit,
+    test_completed_tasks,
+    test_overdue_tasks,
+    test_projects_with_tasks,
+)
+
 # Test database URL (separate from development database)
 TEST_DATABASE_URL = "postgresql+asyncpg://ardha_user:ardha_password@localhost:5432/ardha_test"
 

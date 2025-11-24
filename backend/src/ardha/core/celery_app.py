@@ -40,11 +40,31 @@ celery_app.conf.update(
     task_routes={
         "ardha.jobs.memory_jobs.*": {"queue": "memory"},
         "ardha.jobs.memory_cleanup.*": {"queue": "cleanup"},
+        "git.*": {"queue": "memory"},  # Git jobs use memory queue
+        "tasks.*": {"queue": "analytics"},  # Task jobs use analytics queue
+        "cost.*": {"queue": "analytics"},  # Cost jobs use analytics queue
+        "maintenance.*": {"queue": "maintenance"},  # Maintenance jobs
     },
     # Task annotations
     task_annotations={
         "ardha.jobs.memory_jobs.*": {"time_limit": 300},  # 5 minutes
         "ardha.jobs.memory_cleanup.*": {"time_limit": 600},  # 10 minutes
+        "git.*": {
+            "rate_limit": "10/m",  # Max 10 per minute
+            "time_limit": 300,  # 5 minutes
+        },
+        "tasks.*": {
+            "rate_limit": "5/m",  # Max 5 per minute
+            "time_limit": 600,  # 10 minutes
+        },
+        "cost.*": {
+            "rate_limit": "5/m",  # Max 5 per minute
+            "time_limit": 600,  # 10 minutes
+        },
+        "maintenance.*": {
+            "rate_limit": "1/h",  # Max 1 per hour
+            "time_limit": 1800,  # 30 minutes
+        },
     },
 )
 
@@ -74,6 +94,41 @@ celery_app.conf.beat_schedule = {
     "build-memory-relationships": {
         "task": "ardha.jobs.memory_jobs.build_memory_relationships",
         "schedule": crontab(hour="5", minute="0"),
+    },
+    # Team velocity calculation daily at 2 AM
+    "calculate-team-velocity": {
+        "task": "tasks.calculate_team_velocity",
+        "schedule": crontab(hour="2", minute="0"),
+    },
+    # Overdue task reminders daily at 9 AM
+    "send-overdue-reminders": {
+        "task": "tasks.send_overdue_task_reminders",
+        "schedule": crontab(hour="9", minute="0"),
+    },
+    # Daily cost report generation at 6 AM
+    "generate-daily-cost-report": {
+        "task": "cost.generate_daily_cost_report",
+        "schedule": crontab(hour="6", minute="0"),
+    },
+    # AI usage pattern analysis every Monday at 8 AM
+    "analyze-usage-patterns": {
+        "task": "cost.analyze_ai_usage_patterns",
+        "schedule": crontab(hour="8", minute="0", day_of_week="1"),
+    },
+    # Project analytics calculation every Sunday at 10 AM
+    "calculate-project-analytics": {
+        "task": "cost.calculate_project_analytics",
+        "schedule": crontab(hour="10", minute="0", day_of_week="0"),
+    },
+    # Session cleanup weekly on Sunday at 3 AM
+    "cleanup-old-sessions": {
+        "task": "maintenance.cleanup_old_sessions",
+        "schedule": crontab(hour="3", minute="0", day_of_week="0"),
+    },
+    # Database backup daily at 2 AM
+    "backup-database": {
+        "task": "maintenance.backup_database",
+        "schedule": crontab(hour="2", minute="0"),
     },
 }
 

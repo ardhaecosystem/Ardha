@@ -166,6 +166,12 @@ class GitCommitService:
             if file_ids:
                 await self._link_commit_to_files(created_commit.id, file_ids)
 
+            # Trigger background memory ingestion
+            from ardha.jobs.git_jobs import ingest_commit_to_memory
+
+            # Use apply_async instead of delay for better type safety and options
+            ingest_commit_to_memory.apply_async(args=[str(created_commit.id)])  # type: ignore
+
             logger.info(f"Created commit {commit_info['sha']} in project {project_id}")
             return created_commit
 
