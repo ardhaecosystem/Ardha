@@ -5,15 +5,15 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Ardha - AI-Powered Development Platform",
-  description: "Unified workspace for AI-assisted software development",
+  title: "Ardha - AI-Native Project Management",
+  description: "Build better software with AI assistance",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="en">
       <body className={inter.className}>{children}</body>
