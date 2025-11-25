@@ -1,0 +1,23 @@
+{
+  "proposal_id": "archive-test-proposal",
+  "title": "Archive Test Proposal",
+  "author": "Test User",
+  "created_at": "2024-01-01T00:00:00Z",
+  "generated_at": "2024-01-01T00:00:00Z",
+  "workflow_id": "3d782c51-34ac-475c-b8ac-faf8131ccd82",
+  "description": null,
+  "objectives": [],
+  "scope": {},
+  "success_criteria": [],
+  "total_tasks": 1,
+  "estimated_effort": "10 hours",
+  "quality_score": 0.8,
+  "files_generated": [
+    "proposal.md",
+    "tasks.md",
+    "spec-delta.md",
+    "README.md",
+    "risk-assessment.md"
+  ],
+  "change_directory_path": "/home/veda/ardha-projects/Ardha/openspec/changes/archive-test-proposal"
+}

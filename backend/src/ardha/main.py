@@ -1,0 +1,105 @@
+"""
+Main FastAPI application for Ardha backend.
+"""
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+
+from ardha.api.v1.routes import (
+    auth,
+    chats,
+    databases,
+    files,
+    git,
+    github,
+    memories,
+    milestones,
+    notifications,
+    oauth,
+    openspec,
+    projects,
+    task_generation,
+    tasks,
+    websocket,
+    workflows,
+)
+from ardha.api.v1.webhooks import github as github_webhooks
+from ardha.core.config import settings
+
+
+def create_app() -> FastAPI:
+    """Create and configure FastAPI application."""
+    app = FastAPI(
+        title="Ardha API",
+        description="Ardha backend API",
+        version="0.1.0",
+        debug=settings.debug,
+    )
+
+    # Configure CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.get_cors_origins(),
+        allow_credentials=settings.cors.allow_credentials,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Add trusted host middleware for WebSocket support
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "*"])
+
+    # Include API routers
+    app.include_router(auth.router, prefix="/api/v1")
+    app.include_router(oauth.router, prefix="/api/v1")
+    app.include_router(projects.router, prefix="/api/v1")
+    app.include_router(milestones.router, prefix="/api/v1/milestones")
+    app.include_router(tasks.router, prefix="/api/v1")
+    app.include_router(databases.router, prefix="/api/v1")
+    app.include_router(files.router, prefix="/api/v1")
+    app.include_router(git.router, prefix="/api/v1")
+    app.include_router(github.router, prefix="/api/v1")  # GitHub integration routes
+    app.include_router(chats.router, prefix="/api/v1")
+    app.include_router(memories.router, prefix="/api/v1")
+    app.include_router(notifications.router, prefix="/api/v1")
+    app.include_router(openspec.router, prefix="/api/v1")
+    app.include_router(websocket.router, prefix="/api/v1")
+    app.include_router(task_generation.router, prefix="/api/v1")
+    app.include_router(workflows.router, prefix="/api/v1")
+
+    # Include webhook routers (public endpoints)
+    app.include_router(github_webhooks.router, prefix="/api/v1")  # GitHub webhooks
+
+    # Health check endpoint
+    @app.get("/health")
+    async def health_check():
+        """Health check endpoint."""
+        return {"status": "healthy", "service": "ardha-backend"}
+
+    # Root endpoint
+    @app.get("/")
+    async def root():
+        """Root endpoint."""
+        return {
+            "message": "Welcome to Ardha API",
+            "version": "0.1.0",
+            "environment": settings.app_env,
+        }
+
+    return app
+
+
+# Create FastAPI app instance
+app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "ardha.main:app",
+        host="127.0.0.1",  # Use localhost instead of 0.0.0.0 for security
+        port=8000,
+        reload=settings.debug,
+        log_level=settings.log_level.lower(),
+    )
