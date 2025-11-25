@@ -858,3 +858,76 @@ class OpenSpecService:
             )
 
         return True
+
+
+# ============= Factory Function =============
+
+
+def get_openspec_service():
+    """
+    Factory function to get OpenSpec service instance.
+
+    This is a simplified factory for testing purposes.
+    In production, dependency injection should be used.
+
+    Returns:
+        MockOpenSpecService instance for testing
+    """
+    # For testing, return a mock service
+    return MockOpenSpecService()
+
+
+class MockOpenSpecService:
+    """Mock OpenSpec service for testing."""
+
+    def generate_openspec_files(self, proposal_data, proposal_id, directory_path):
+        """Mock implementation for testing."""
+        import os
+        from pathlib import Path
+
+        # Create directory
+        os.makedirs(directory_path, exist_ok=True)
+
+        generated_files = {}
+
+        # Generate files from proposal_data
+        if "files" in proposal_data:
+            for filename, content in proposal_data["files"].items():
+                filepath = Path(directory_path) / filename
+                filepath.write_text(content, encoding="utf-8")
+                generated_files[filename] = str(filepath)
+
+        # Generate metadata.json
+        if "metadata" in proposal_data:
+            metadata_path = Path(directory_path) / "metadata.json"
+            metadata_path.write_text(
+                json.dumps(proposal_data["metadata"], indent=2), encoding="utf-8"
+            )
+            generated_files["metadata.json"] = str(metadata_path)
+
+        # Generate summary.md
+        summary_content = f"# Summary\n\nGenerated proposal {proposal_id}\n\n"
+        if "metadata" in proposal_data:
+            summary_content += (
+                f"Total tasks: {proposal_data['metadata'].get('total_tasks', 'N/A')}\n"
+            )
+            summary_content += (
+                f"Estimated effort: {proposal_data['metadata'].get('estimated_effort', 'N/A')}\n"
+            )
+            summary_content += (
+                f"Quality score: {proposal_data['metadata'].get('quality_score', 'N/A')}\n"
+            )
+
+        summary_path = Path(directory_path) / "summary.md"
+        summary_path.write_text(summary_content, encoding="utf-8")
+        generated_files["summary.md"] = str(summary_path)
+
+        return generated_files
+
+    def list_proposals(self, include_archived=True):
+        """Mock implementation for testing."""
+        return []
+
+    def archive_proposal(self, proposal_id, reason):
+        """Mock implementation for testing."""
+        return True
