@@ -1,9 +1,10 @@
 # Current Context
 
-**Last Updated:** November 24, 2025
-**Current Branch:** `main`
+**Last Updated:** November 29, 2025
+**Current Branch:** `feature/initial-setup`
 **Active Phase:** Phase 5 - Frontend Development (Week 13-16)
 **Previous Phase:** Phase 4 - Databases & Background Jobs ✅ COMPLETE
+**Recent Achievement:** Frontend Integration & Authentication Flow ✅ COMPLETE
 
 ## Project Overview
 
@@ -317,6 +318,168 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
   }
 }
 ```
+
+## Recent Work: Frontend Integration Fix (November 29, 2025)
+
+### Major Achievement: Frontend Authentication Flow Complete ✅
+
+Successfully debugged and fixed 4 critical issues blocking frontend functionality:
+
+#### Issue 1: Tailwind CSS Not Loading
+**Problem:**
+- Registration page showed black background instead of gradient
+- No styling applied to any components
+- Missing configuration files
+
+**Root Cause:**
+- No `tailwind.config.ts` - Tailwind couldn't compile
+- No `postcss.config.js` - PostCSS couldn't process directives
+- Generic CSS without design system
+
+**Fix:**
+- Created [`tailwind.config.ts`](frontend/tailwind.config.ts:1) (59 lines) with complete color system
+- Created [`postcss.config.js`](frontend/postcss.config.js:1) with Tailwind + Autoprefixer
+- Updated [`globals.css`](frontend/app/globals.css:1) with CSS variables and gradient
+
+**Result:** Beautiful blue-to-indigo gradient, complete design system working
+
+#### Issue 2: "Failed to Fetch" API Errors
+**Problem:**
+- User registration failed with network errors
+- Browser couldn't connect to backend
+- Console showed "Failed to fetch"
+
+**Root Cause:**
+- Frontend JavaScript trying to call `http://localhost:8000`
+- User's browser can't resolve `localhost` to backend container
+- `NEXT_PUBLIC_*` env vars baked in at build time, not runtime
+- Build used default value instead of public IP
+
+**Fix:**
+- Updated [`frontend/Dockerfile`](frontend/Dockerfile:19-22) with ARG for `NEXT_PUBLIC_API_URL`
+- Updated [`docker-compose.yml`](docker-compose.yml:159-161) to pass public IP as build args
+- JavaScript bundle now contains `http://82.29.164.29:8000`
+
+**Result:** Browser successfully calls backend API from any location
+
+#### Issue 3: CORS Blocking Requests
+**Problem:**
+- Backend rejecting requests with "Disallowed CORS origin"
+- CORS preflight (OPTIONS) failing
+- Registration API returning 400 errors
+
+**Root Cause:**
+- Backend CORS only allowed `localhost:3000` and `127.0.0.1:3000`
+- Frontend accessed at `http://82.29.164.29:3000`
+- Pydantic Settings couldn't parse .env JSON array format
+
+**Fix:**
+- Modified [`main.py`](backend/src/ardha/main.py:40-52) to allow all origins in debug mode
+- Added: `if settings.debug: cors_origins = ["*"]`
+- Commented out problematic .env CORS config
+
+**Result:** All CORS requests accepted, registration working
+
+#### Issue 4: Dashboard 404 Error
+**Problem:**
+- After successful login, `/dashboard` redirect showed 404
+- Dashboard components existed but weren't accessible
+
+**Root Cause:**
+- Folder named `app/(dashboard)` with parentheses
+- Next.js route groups `(folder)` don't create URL routes
+- Only organize files, don't affect routing
+
+**Fix:**
+- Renamed `app/(dashboard)` → `app/dashboard`
+- Next.js build now includes `/dashboard` in route manifest
+- Layout and page components preserved
+
+**Result:** Dashboard accessible, login redirect working
+
+### Technical Insights Gained
+
+**1. Next.js Environment Variables:**
+- `NEXT_PUBLIC_*` vars are embedded during webpack build
+- Must set via Dockerfile ARG before `pnpm run build`
+- Can't change at runtime without rebuild
+- Browser executes bundled JS (not Node.js)
+
+**2. Docker Networking:**
+- Container-to-container: Use service names (`backend:8000`)
+- Browser-to-container: Use public IP (`82.29.164.29:8000`)
+- Different networks require different URLs
+
+**3. CORS Best Practices:**
+- Development: Use permissive (`["*"]`) for ease
+- Production: Restrict to specific domains
+- Never use `["*"]` with `allow_credentials=true` in production
+
+**4. Next.js Routing:**
+- `(folder)` = Route group (organization only)
+- `folder` = URL segment that creates route
+- Test routes in build output manifest
+
+### Files Modified
+
+**Frontend Configuration (8 files):**
+- `tailwind.config.ts` (NEW) - 59 lines
+- `postcss.config.js` (NEW) - 6 lines
+- `.dockerignore` (NEW) - 41 lines
+- `Dockerfile` - Added build args
+- `globals.css` - Complete CSS system
+- `next.config.js` - Environment handling
+- `package.json` - Version updates
+- `app/dashboard/` - Renamed from (dashboard)
+
+**Backend (2 files):**
+- `main.py` - CORS allows all in debug
+- `Dockerfile` - Added curl for health checks
+
+**Docker (1 file):**
+- `docker-compose.yml` - Public IP configuration
+
+**VSCode (1 file - not committed, gitignored):**
+- `.vscode/settings.json` - Suppress false warnings
+
+**Total: 13 files (4 new, 7 modified, 2 renamed)**
+**Commits: 2 commits on feature/initial-setup**
+**Git Status: Clean working tree**
+
+### Verification Results
+
+**Services Status:**
+```
+✅ Frontend:   HEALTHY (http://82.29.164.29:3000)
+✅ Backend:    HEALTHY (http://82.29.164.29:8000)
+✅ PostgreSQL: HEALTHY
+✅ Redis:      HEALTHY
+✅ Qdrant:     RUNNING
+```
+
+**User Flow Testing:**
+```
+✅ Registration: Creating users (201 Created)
+✅ Login:        Auto-login after registration
+✅ Dashboard:    Displaying stats and navigation
+✅ Styling:      Gradient background, Tailwind working
+✅ CORS:         All origins allowed in debug mode
+```
+
+**Build Artifacts:**
+```
+✅ Tailwind CSS:    16KB bundle (cf23d152a68895ba.css)
+✅ Dashboard Route: Present in build manifest
+✅ API URL:         http://82.29.164.29:8000 in JS bundle
+```
+
+### Lessons for Team
+
+1. **Always verify environment variable behavior** - Runtime vs build-time
+2. **Test CORS with actual Origin headers** - Not just direct API calls
+3. **Check Next.js build output** - Confirms routes are actually created
+4. **Use code-based config when .env parsing fails** - More reliable
+5. **Docker networking differs from browser networking** - Document both patterns
 
 ## Current Development Status
 
