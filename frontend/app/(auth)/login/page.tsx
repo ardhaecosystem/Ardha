@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
+import { useOAuth } from "@/hooks/use-oauth";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, isLoading } = useAuth();
+  const { loginWithGitHub, loginWithGoogle } = useOAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -209,6 +211,7 @@ export default function LoginPage() {
               {/* GitHub OAuth */}
               <button
                 type="button"
+                onClick={loginWithGitHub}
                 className="w-full py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all duration-200 flex items-center justify-center gap-2"
                 disabled={isLoading}
               >
@@ -229,6 +232,7 @@ export default function LoginPage() {
               {/* Google OAuth */}
               <button
                 type="button"
+                onClick={loginWithGoogle}
                 className="w-full py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all duration-200 flex items-center justify-center gap-2"
                 disabled={isLoading}
               >

@@ -545,29 +545,29 @@ Development teams need dedicated real-time collaboration for markdown documents.
                 project_id = uuid4()
 
                 result = await workflow.execute(
-                        research_summary=self.sample_research_summary,
-                        user_id=user_id,
-                        project_id=project_id,
-                        parameters={"test_mode": True}
-                    )
+                    research_summary=self.sample_research_summary,
+                    user_id=user_id,
+                    project_id=project_id,
+                    parameters={"test_mode": True}
+                )
 
-                    # Verify results
-                    assert result.status == WorkflowStatus.COMPLETED, f"Workflow status: {result.status}"
-                    assert result.final_prd is not None, "Final PRD should not be None"
-                    assert len(result.final_prd) > 1000, "PRD should be substantial"
+                # Verify results
+                assert result.status == WorkflowStatus.COMPLETED, f"Workflow status: {result.status}"
+                assert result.final_prd is not None, "Final PRD should not be None"
+                assert len(result.final_prd) > 1000, "PRD should be substantial"
 
-                    # Verify quality metrics
-                    assert result.requirements_completeness > 0.5, "Requirements completeness too low"
-                    assert result.feature_prioritization_quality > 0.5, "Feature prioritization quality too low"
-                    assert result.metrics_specificity > 0.5, "Metrics specificity too low"
-                    assert result.document_coherence > 0.5, "Document coherence too low"
+                # Verify quality metrics
+                assert result.requirements_completeness > 0.5, "Requirements completeness too low"
+                assert result.feature_prioritization_quality > 0.5, "Feature prioritization quality too low"
+                assert result.metrics_specificity > 0.5, "Metrics specificity too low"
+                assert result.document_coherence > 0.5, "Document coherence too low"
 
-                    # Verify overall quality score
-                    overall_quality = result.calculate_prd_quality_score()
-                    assert overall_quality > 0.5, f"Overall quality too low: {overall_quality}"
+                # Verify overall quality score
+                overall_quality = result.calculate_prd_quality_score()
+                assert overall_quality > 0.5, f"Overall quality too low: {overall_quality}"
 
-                    self.test_results["workflow_execution"]["passed"] += 1
-                    print("✅ Mock workflow execution tests passed")
+                self.test_results["workflow_execution"]["passed"] += 1
+                print("✅ Mock workflow execution tests passed")
 
         except Exception as e:
             self.test_results["workflow_execution"]["failed"] += 1
@@ -616,16 +616,16 @@ Development teams need dedicated real-time collaboration for markdown documents.
                 user_id = uuid4()
 
                 try:
-                        await workflow.execute(
-                            research_summary=self.sample_research_summary,
-                            user_id=user_id,
-                            parameters={"test_mode": True}
-                        )
-                        assert False, "Should have raised an exception"
-                    except Exception as e:
-                        # Any exception is acceptable for this test since we're mocking failure
-                        self.test_results["workflow_execution"]["passed"] += 1
-                        print("✅ Error handling tests passed")
+                    await workflow.execute(
+                        research_summary=self.sample_research_summary,
+                        user_id=user_id,
+                        parameters={"test_mode": True}
+                    )
+                    assert False, "Should have raised an exception"
+                except Exception as e:
+                    # Any exception is acceptable for this test since we're mocking failure
+                    self.test_results["workflow_execution"]["passed"] += 1
+                    print("✅ Error handling tests passed")
 
         except Exception as e:
             self.test_results["workflow_execution"]["failed"] += 1
