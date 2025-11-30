@@ -42,7 +42,11 @@ export default function LoginPage() {
     if (!result.success && result.error) {
       setError(result.error.message);
     } else if (result.success) {
-      router.push("/dashboard");
+      // Redirect to intended destination or dashboard
+      const redirectTo =
+        sessionStorage.getItem("redirectAfterLogin") || "/dashboard";
+      sessionStorage.removeItem("redirectAfterLogin");
+      router.push(redirectTo);
     }
   };
 
