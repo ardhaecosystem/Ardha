@@ -255,7 +255,11 @@ class ChatService:
 
             # Convert to OpenRouter format
             messages = [
-                {"role": msg.role.value, "content": msg.content} for msg in context_messages
+                {
+                    "role": msg.role.value if hasattr(msg.role, 'value') else msg.role,
+                    "content": msg.content
+                }
+                for msg in context_messages
             ]
 
             # Import OpenRouter client here to avoid circular imports
@@ -517,7 +521,7 @@ class ChatService:
             "chat": {
                 "id": chat.id,
                 "title": chat.title,
-                "mode": chat.mode.value,
+                "mode": chat.mode.value if hasattr(chat.mode, 'value') else chat.mode,
                 "created_at": chat.created_at,
                 "updated_at": chat.updated_at,
                 "is_archived": chat.is_archived,
@@ -529,10 +533,10 @@ class ChatService:
             "recent_messages": [
                 {
                     "id": msg.id,
-                    "role": msg.role.value,
+                    "role": msg.role.value if hasattr(msg.role, 'value') else msg.role,
                     "content": msg.content[:200] + ("..." if len(msg.content) > 200 else ""),
                     "created_at": msg.created_at,
-                    "model_used": msg.model_used,
+                    "ai_model": msg.model_used,  # Use ai_model to match schema
                 }
                 for msg in recent_messages
             ],

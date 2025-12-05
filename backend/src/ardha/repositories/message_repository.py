@@ -268,42 +268,64 @@ class MessageRepository:
             chat_id: UUID of chat
 
         Returns:
-            Dictionary with token statistics:
-            - total_input_tokens: Sum of input tokens
-            - total_output_tokens: Sum of output tokens
-            - message_count: Total number of messages
+            Dictionary with message statistics matching MessageStats schema:
+            - total_messages: Total number of messages
+            - user_messages: Number of user messages
             - assistant_messages: Number of assistant messages
+            - system_messages: Number of system messages
+            - total_tokens: Sum of all tokens
+            - total_cost: Total cost
 
         Raises:
             SQLAlchemyError: If database query fails
         """
         try:
-            # Get token aggregates
+            # Get basic counts and token sums
             token_stmt = select(
-                func.coalesce(func.sum(Message.tokens_input), 0).label("total_input_tokens"),
-                func.coalesce(func.sum(Message.tokens_output), 0).label("total_output_tokens"),
-                func.count(Message.id).label("message_count"),
-                func.sum(func.case((Message.role == MessageRole.ASSISTANT, 1), else_=0)).label(
-                    "assistant_messages"
-                ),
+                func.count(Message.id).label("total_messages"),
+                func.coalesce(func.sum(Message.tokens_input), 0).label("total_input"),
+                func.coalesce(func.sum(Message.tokens_output), 0).label("total_output"),
+                func.coalesce(func.sum(Message.cost), 0).label("total_cost"),
             ).where(Message.chat_id == chat_id)
 
             result = await self.db.execute(token_stmt)
             row = result.first()
 
+            # Get counts by role
+            user_stmt = select(func.count(Message.id)).where(
+                and_(Message.chat_id == chat_id, Message.role == MessageRole.USER)
+            )
+            user_count = (await self.db.execute(user_stmt)).scalar() or 0
+
+            assistant_stmt = select(func.count(Message.id)).where(
+                and_(Message.chat_id == chat_id, Message.role == MessageRole.ASSISTANT)
+            )
+            assistant_count = (await self.db.execute(assistant_stmt)).scalar() or 0
+
+            system_stmt = select(func.count(Message.id)).where(
+                and_(Message.chat_id == chat_id, Message.role == MessageRole.SYSTEM)
+            )
+            system_count = (await self.db.execute(system_stmt)).scalar() or 0
+
             if row is None:
                 return {
-                    "total_input_tokens": 0,
-                    "total_output_tokens": 0,
-                    "message_count": 0,
+                    "total_messages": 0,
+                    "user_messages": 0,
                     "assistant_messages": 0,
+                    "system_messages": 0,
+                    "total_tokens": 0,
+                    "total_cost": 0.0,
                 }
 
+            total_tokens = (row.total_input or 0) + (row.total_output or 0)
+
             return {
-                "total_input_tokens": row.total_input_tokens or 0,
-                "total_output_tokens": row.total_output_tokens or 0,
-                "message_count": row.message_count or 0,
-                "assistant_messages": row.assistant_messages or 0,
+                "total_messages": row.total_messages or 0,
+                "user_messages": user_count,
+                "assistant_messages": assistant_count,
+                "system_messages": system_count,
+                "total_tokens": total_tokens,
+                "total_cost": float(row.total_cost or 0),
             }
         except SQLAlchemyError as e:
             logger.error(f"Error getting token stats for chat {chat_id}: {e}", exc_info=True)

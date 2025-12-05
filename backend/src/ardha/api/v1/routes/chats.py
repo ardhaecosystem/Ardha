@@ -71,7 +71,7 @@ async def create_chat(
         return ChatResponse(
             id=chat.id,
             title=chat.title,
-            mode=chat.mode.value,
+            mode=chat.mode.value if hasattr(chat.mode, 'value') else chat.mode,
             created_at=chat.created_at,
             updated_at=chat.updated_at,
             is_archived=chat.is_archived,
@@ -118,20 +118,30 @@ async def send_message(
         404: Chat not found
         500: Database or AI service error
     """
-    logger.info(f"Sending message to chat {chat_id} from user {current_user.id}")
+    logger.info(f"[ROUTE] Sending message to chat {chat_id} from user {current_user.id}, model: {request.model}")
 
     try:
         chat_service = ChatService(db)
 
         async def generate_response():
-            async for chunk in chat_service.send_message(
-                chat_id=chat_id,
-                user_id=current_user.id,
-                content=request.content,
-                model=request.model,
-            ):
-                yield f"data: {chunk}\n\n"
-            yield "data: [DONE]\n\n"
+            logger.info(f"[ROUTE] Starting stream generation for chat {chat_id}")
+            chunk_count = 0
+            try:
+                async for chunk in chat_service.send_message(
+                    chat_id=chat_id,
+                    user_id=current_user.id,
+                    content=request.content,
+                    model=request.model,
+                ):
+                    chunk_count += 1
+                    logger.debug(f"[ROUTE] Yielding chunk #{chunk_count}: {chunk[:50] if len(chunk) > 50 else chunk}")
+                    yield f"data: {chunk}\n\n"
+                logger.info(f"[ROUTE] Stream completed, total chunks: {chunk_count}")
+                yield "data: [DONE]\n\n"
+            except Exception as e:
+                logger.error(f"[ROUTE] Error in stream generation: {e}", exc_info=True)
+                yield f"data: {{\"error\": \"{str(e)}\"}}\n\n"
+                yield "data: [DONE]\n\n"
 
         return StreamingResponse(
             generate_response(),
@@ -144,6 +154,7 @@ async def send_message(
         )
 
     except (ChatNotFoundError, InsufficientChatPermissionsError, ChatBudgetExceededError) as e:
+        logger.error(f"[ROUTE] Permissions/budget error: {e}")
         raise HTTPException(
             status_code=(
                 403
@@ -153,7 +164,7 @@ async def send_message(
             detail=str(e),
         )
     except Exception as e:
-        logger.error(f"Error sending message: {e}", exc_info=True)
+        logger.error(f"[ROUTE] Error sending message: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -201,10 +212,10 @@ async def get_chat_history(
         return [
             MessageResponse(
                 id=msg.id,
-                role=msg.role.value,
+                role=msg.role.value if hasattr(msg.role, 'value') else msg.role,  # Handle both enum and string
                 content=msg.content,
                 created_at=msg.created_at,
-                model_used=msg.model_used,
+                ai_model=msg.model_used,  # Use ai_model field name (matches MessageResponse schema)
                 tokens_input=msg.tokens_input,
                 tokens_output=msg.tokens_output,
                 cost=float(msg.cost) if msg.cost else None,
@@ -261,7 +272,7 @@ async def get_user_chats(
             ChatResponse(
                 id=chat.id,
                 title=chat.title,
-                mode=chat.mode.value,
+                mode=chat.mode.value if hasattr(chat.mode, 'value') else chat.mode,
                 created_at=chat.created_at,
                 updated_at=chat.updated_at,
                 is_archived=chat.is_archived,
@@ -360,7 +371,7 @@ async def archive_chat(
         return ChatResponse(
             id=chat.id,
             title=chat.title,
-            mode=chat.mode.value,
+            mode=chat.mode.value if hasattr(chat.mode, 'value') else chat.mode,
             created_at=chat.created_at,
             updated_at=chat.updated_at,
             is_archived=chat.is_archived,
