@@ -30,7 +30,8 @@ export function useProjects() {
         throw new Error("Failed to fetch projects");
       }
 
-      return response.json() as Promise<Project[]>;
+      const data = await response.json();
+      return data.projects as Project[];
     },
     enabled: !!accessToken,
   });
