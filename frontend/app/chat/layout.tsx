@@ -1,5 +1,5 @@
-import { ProtectedRoute } from '@/components/auth/protected-route';
-import { Navbar } from '@/components/navigation/navbar';
+import { ProtectedRoute } from "@/components/auth/protected-route";
+import { Navbar } from "@/components/navigation/navbar";
 
 export default function ChatLayout({
   children,
@@ -21,25 +21,26 @@ export default function ChatLayout({
             `,
           }}
         />
-        
+
         {/* CRT Scanlines Effect */}
-        <div 
+        <div
           className="fixed inset-0 z-0 pointer-events-none opacity-5"
           style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 255, 0.5) 3px)',
-            backgroundSize: '100% 4px',
+            backgroundImage:
+              "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 255, 0.5) 3px)",
+            backgroundSize: "100% 4px",
           }}
         />
 
         {/* Grid Pattern Overlay */}
-        <div 
+        <div
           className="fixed inset-0 z-0 pointer-events-none opacity-[0.03]"
           style={{
             backgroundImage: `
               linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px),
               linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px)
             `,
-            backgroundSize: '50px 50px',
+            backgroundSize: "50px 50px",
           }}
         />
 
@@ -49,9 +50,7 @@ export default function ChatLayout({
         </div>
 
         {/* Main Chat Content */}
-        <main className="relative z-10 flex-1 overflow-hidden">
-          {children}
-        </main>
+        <main className="relative z-10 flex-1 overflow-hidden">{children}</main>
       </div>
     </ProtectedRoute>
   );

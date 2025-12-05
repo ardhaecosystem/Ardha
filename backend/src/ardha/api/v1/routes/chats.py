@@ -16,7 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ardha.core.database import get_db
 from ardha.core.rate_limit import check_chat_rate_limit
 from ardha.core.security import get_current_user
-from ardha.models.chat import ChatMode
 from ardha.models.user import User
 from ardha.schemas.requests.chat import CreateChatRequest, MessageSendRequest
 from ardha.schemas.responses.chat import ChatResponse, ChatSummaryResponse, MessageResponse
@@ -71,7 +70,7 @@ async def create_chat(
         return ChatResponse(
             id=chat.id,
             title=chat.title,
-            mode=chat.mode.value if hasattr(chat.mode, 'value') else chat.mode,
+            mode=chat.mode.value if hasattr(chat.mode, "value") else chat.mode,
             created_at=chat.created_at,
             updated_at=chat.updated_at,
             is_archived=chat.is_archived,
@@ -118,7 +117,9 @@ async def send_message(
         404: Chat not found
         500: Database or AI service error
     """
-    logger.info(f"[ROUTE] Sending message to chat {chat_id} from user {current_user.id}, model: {request.model}")
+    logger.info(
+        f"[ROUTE] Sending message to chat {chat_id} from user {current_user.id}, model: {request.model}"
+    )
 
     try:
         chat_service = ChatService(db)
@@ -134,13 +135,15 @@ async def send_message(
                     model=request.model,
                 ):
                     chunk_count += 1
-                    logger.debug(f"[ROUTE] Yielding chunk #{chunk_count}: {chunk[:50] if len(chunk) > 50 else chunk}")
+                    logger.debug(
+                        f"[ROUTE] Yielding chunk #{chunk_count}: {chunk[:50] if len(chunk) > 50 else chunk}"
+                    )
                     yield f"data: {chunk}\n\n"
                 logger.info(f"[ROUTE] Stream completed, total chunks: {chunk_count}")
                 yield "data: [DONE]\n\n"
             except Exception as e:
                 logger.error(f"[ROUTE] Error in stream generation: {e}", exc_info=True)
-                yield f"data: {{\"error\": \"{str(e)}\"}}\n\n"
+                yield f'data: {{"error": "{str(e)}"}}\n\n'
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(
@@ -212,7 +215,9 @@ async def get_chat_history(
         return [
             MessageResponse(
                 id=msg.id,
-                role=msg.role.value if hasattr(msg.role, 'value') else msg.role,  # Handle both enum and string
+                role=(
+                    msg.role.value if hasattr(msg.role, "value") else msg.role
+                ),  # Handle both enum and string
                 content=msg.content,
                 created_at=msg.created_at,
                 ai_model=msg.model_used,  # Use ai_model field name (matches MessageResponse schema)
@@ -272,7 +277,7 @@ async def get_user_chats(
             ChatResponse(
                 id=chat.id,
                 title=chat.title,
-                mode=chat.mode.value if hasattr(chat.mode, 'value') else chat.mode,
+                mode=chat.mode.value if hasattr(chat.mode, "value") else chat.mode,
                 created_at=chat.created_at,
                 updated_at=chat.updated_at,
                 is_archived=chat.is_archived,
@@ -371,7 +376,7 @@ async def archive_chat(
         return ChatResponse(
             id=chat.id,
             title=chat.title,
-            mode=chat.mode.value if hasattr(chat.mode, 'value') else chat.mode,
+            mode=chat.mode.value if hasattr(chat.mode, "value") else chat.mode,
             created_at=chat.created_at,
             updated_at=chat.updated_at,
             is_archived=chat.is_archived,

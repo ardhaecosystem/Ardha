@@ -12,7 +12,6 @@ from uuid import UUID
 from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from ardha.models.message import Message, MessageRole
 

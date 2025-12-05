@@ -63,7 +63,8 @@ SYSTEM_MESSAGES = {
 - Explain technical concepts clearly
 - Recommend preventive measures
 - Help verify fixes and solutions""",
-    ChatMode.CHAT: """You are a helpful AI assistant. Your role is to provide accurate, thoughtful, and useful responses to user questions. You should:
+    ChatMode.CHAT: """You are a helpful AI assistant. Your role is to provide
+accurate, thoughtful, and useful responses to user questions. You should:
 - Understand the user's intent and context
 - Provide clear, concise, and accurate information
 - Ask follow-up questions when needed
@@ -256,8 +257,8 @@ class ChatService:
             # Convert to OpenRouter format
             messages = [
                 {
-                    "role": msg.role.value if hasattr(msg.role, 'value') else msg.role,
-                    "content": msg.content
+                    "role": msg.role.value if hasattr(msg.role, "value") else msg.role,
+                    "content": msg.content,
                 }
                 for msg in context_messages
             ]
@@ -521,7 +522,7 @@ class ChatService:
             "chat": {
                 "id": chat.id,
                 "title": chat.title,
-                "mode": chat.mode.value if hasattr(chat.mode, 'value') else chat.mode,
+                "mode": chat.mode.value if hasattr(chat.mode, "value") else chat.mode,
                 "created_at": chat.created_at,
                 "updated_at": chat.updated_at,
                 "is_archived": chat.is_archived,
@@ -533,7 +534,7 @@ class ChatService:
             "recent_messages": [
                 {
                     "id": msg.id,
-                    "role": msg.role.value if hasattr(msg.role, 'value') else msg.role,
+                    "role": msg.role.value if hasattr(msg.role, "value") else msg.role,
                     "content": msg.content[:200] + ("..." if len(msg.content) > 200 else ""),
                     "created_at": msg.created_at,
                     "ai_model": msg.model_used,  # Use ai_model to match schema

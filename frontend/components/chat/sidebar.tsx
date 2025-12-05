@@ -1,7 +1,12 @@
-'use client';
+"use client";
 
-import { useChats, useCreateChat, useDeleteChat, type Chat } from '@/hooks/use-chats';
-import { useState } from 'react';
+import {
+  useChats,
+  useCreateChat,
+  useDeleteChat,
+  type Chat,
+} from "@/hooks/use-chats";
+import { useState } from "react";
 
 interface ChatSidebarProps {
   selectedChatId: string | null;
@@ -9,46 +14,59 @@ interface ChatSidebarProps {
   onNewChat: () => void;
 }
 
-export function ChatSidebar({ selectedChatId, onSelectChat, onNewChat }: ChatSidebarProps) {
+export function ChatSidebar({
+  selectedChatId,
+  onSelectChat,
+  onNewChat,
+}: ChatSidebarProps) {
   const { data: chats = [], isLoading } = useChats();
   const createChat = useCreateChat();
   const deleteChat = useDeleteChat();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const filteredChats = chats.filter((chat) =>
-    chat.title.toLowerCase().includes(searchQuery.toLowerCase())
+    chat.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const handleNewChat = async () => {
     try {
-      console.log('[ChatSidebar] Creating new chat...');
+      console.log("[ChatSidebar] Creating new chat...");
       const newChat = await createChat.mutateAsync({
-        mode: 'chat',
+        mode: "chat",
       });
-      console.log('[ChatSidebar] Created chat:', newChat);
+      console.log("[ChatSidebar] Created chat:", newChat);
       onSelectChat(newChat.id);
     } catch (error) {
-      console.error('[ChatSidebar] Failed to create chat:', error);
-      alert(`Failed to create chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("[ChatSidebar] Failed to create chat:", error);
+      alert(
+        `Failed to create chat: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   };
 
   const handleDeleteChat = async (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this chat? This cannot be undone.')) return;
+    if (
+      !confirm(
+        "Are you sure you want to delete this chat? This cannot be undone.",
+      )
+    )
+      return;
 
     setDeletingId(chatId);
     try {
-      console.log('[ChatSidebar] Deleting chat:', chatId);
+      console.log("[ChatSidebar] Deleting chat:", chatId);
       await deleteChat.mutateAsync(chatId);
       if (selectedChatId === chatId) {
         onNewChat();
       }
-      console.log('[ChatSidebar] Chat deleted successfully');
+      console.log("[ChatSidebar] Chat deleted successfully");
     } catch (error) {
-      console.error('[ChatSidebar] Failed to delete chat:', error);
-      alert(`Failed to delete chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("[ChatSidebar] Failed to delete chat:", error);
+      alert(
+        `Failed to delete chat: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     } finally {
       setDeletingId(null);
     }
@@ -70,8 +88,18 @@ export function ChatSidebar({ selectedChatId, onSelectChat, onNewChat }: ChatSid
             </>
           ) : (
             <>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
               </svg>
               <span>New Chat</span>
             </>
@@ -95,7 +123,12 @@ export function ChatSidebar({ selectedChatId, onSelectChat, onNewChat }: ChatSid
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
         </div>
       </div>
@@ -105,14 +138,17 @@ export function ChatSidebar({ selectedChatId, onSelectChat, onNewChat }: ChatSid
         {isLoading ? (
           <div className="p-4 space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-16 rounded-lg glass-panel animate-pulse" />
+              <div
+                key={i}
+                className="h-16 rounded-lg glass-panel animate-pulse"
+              />
             ))}
           </div>
         ) : filteredChats.length === 0 ? (
           <div className="p-8 text-center">
             <div className="text-4xl mb-4">💬</div>
             <p className="text-white/60 text-sm">
-              {searchQuery ? 'No chats found' : 'No chats yet'}
+              {searchQuery ? "No chats found" : "No chats yet"}
             </p>
             <p className="text-white/40 text-xs mt-2">
               Click "New Chat" to start
@@ -125,8 +161,8 @@ export function ChatSidebar({ selectedChatId, onSelectChat, onNewChat }: ChatSid
                 key={chat.id}
                 className={`relative group/chat transition-all duration-200 ${
                   selectedChatId === chat.id
-                    ? 'glass-panel border-[hsl(var(--neon-blue))]/50 bg-[hsl(var(--neon-blue))]/10'
-                    : 'hover:glass-panel hover:bg-white/5'
+                    ? "glass-panel border-[hsl(var(--neon-blue))]/50 bg-[hsl(var(--neon-blue))]/10"
+                    : "hover:glass-panel hover:bg-white/5"
                 } rounded-lg`}
               >
                 <button
@@ -139,8 +175,10 @@ export function ChatSidebar({ selectedChatId, onSelectChat, onNewChat }: ChatSid
                         {chat.title}
                       </div>
                       <div className="flex items-center gap-2 text-white/40 text-xs">
-                        <span>{new Date(chat.updated_at).toLocaleDateString()}</span>
-                        {chat.mode !== 'chat' && (
+                        <span>
+                          {new Date(chat.updated_at).toLocaleDateString()}
+                        </span>
+                        {chat.mode !== "chat" && (
                           <>
                             <span>•</span>
                             <span className="capitalize text-[hsl(var(--neon-purple))]">
@@ -161,8 +199,18 @@ export function ChatSidebar({ selectedChatId, onSelectChat, onNewChat }: ChatSid
                       {deletingId === chat.id ? (
                         <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
                       ) : (
-                        <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        <svg
+                          className="w-4 h-4 text-red-400"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
                         </svg>
                       )}
                     </button>
@@ -177,7 +225,7 @@ export function ChatSidebar({ selectedChatId, onSelectChat, onNewChat }: ChatSid
       {/* Footer Stats */}
       <div className="p-4 border-t border-white/10">
         <div className="text-white/40 text-xs text-center">
-          {chats.length} {chats.length === 1 ? 'conversation' : 'conversations'}
+          {chats.length} {chats.length === 1 ? "conversation" : "conversations"}
         </div>
       </div>
     </div>
