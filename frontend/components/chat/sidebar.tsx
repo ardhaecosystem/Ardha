@@ -157,66 +157,55 @@ export function ChatSidebar({
         ) : (
           <div className="p-2 space-y-2">
             {filteredChats.map((chat) => (
-              <div
+              <button
                 key={chat.id}
-                className={`relative group/chat transition-all duration-200 ${
+                onClick={() => onSelectChat(chat.id)}
+                className={`group w-full p-3 rounded-lg text-left transition-all duration-200 ${
                   selectedChatId === chat.id
-                    ? "glass-panel border-[hsl(var(--neon-blue))]/50 bg-[hsl(var(--neon-blue))]/10"
-                    : "hover:glass-panel hover:bg-white/5"
-                } rounded-lg`}
+                    ? "backdrop-blur-xl bg-neon-blue/15 border border-neon-blue/50"
+                    : "hover:backdrop-blur-xl hover:bg-white/5 border border-transparent"
+                }`}
               >
-                <button
-                  onClick={() => onSelectChat(chat.id)}
-                  className="w-full p-3 text-left"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-white font-medium text-sm mb-1 line-clamp-1">
-                        {chat.title}
-                      </div>
-                      <div className="flex items-center gap-2 text-white/40 text-xs">
-                        <span>
-                          {new Date(chat.updated_at).toLocaleDateString()}
-                        </span>
-                        {chat.mode !== "chat" && (
-                          <>
-                            <span>•</span>
-                            <span className="capitalize text-[hsl(var(--neon-purple))]">
-                              {chat.mode}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Delete Button */}
-                    <button
-                      onClick={(e) => handleDeleteChat(chat.id, e)}
-                      disabled={deletingId === chat.id}
-                      className="opacity-0 group-hover/chat:opacity-100 p-1.5 rounded-lg hover:bg-red-500/20 transition-all duration-200 disabled:opacity-50"
-                      aria-label="Delete chat"
-                    >
-                      {deletingId === chat.id ? (
-                        <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
-                      ) : (
-                        <svg
-                          className="w-4 h-4 text-red-400"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
-                      )}
-                    </button>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-white font-medium text-sm line-clamp-1 flex-1">
+                    {chat.title}
                   </div>
-                </button>
-              </div>
+                  {/* Delete button - show on hover */}
+                  <button
+                    onClick={(e) => handleDeleteChat(chat.id, e)}
+                    disabled={deletingId === chat.id}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/20 transition-all duration-200"
+                  >
+                    {deletingId === chat.id ? (
+                      <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                    ) : (
+                      <svg
+                        className="w-3.5 h-3.5 text-red-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-white/40 text-xs">
+                    {new Date(chat.updated_at).toLocaleDateString()}
+                  </div>
+                  {chat.mode && chat.mode !== "chat" && (
+                    <span className="px-1.5 py-0.5 rounded text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      {chat.mode}
+                    </span>
+                  )}
+                </div>
+              </button>
             ))}
           </div>
         )}

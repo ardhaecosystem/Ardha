@@ -6,6 +6,7 @@ import { KanbanColumn } from "@/components/tasks/kanban-column";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { PrioritySelect } from "@/components/tasks/priority-select";
 
 const columns = [
   { title: "To Do", status: "todo" as const },
@@ -53,20 +54,18 @@ export default function TasksPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="px-6 py-6 border-b border-white/10 bg-black/20 backdrop-blur-sm">
+      {/* Header - Compact */}
+      <div className="px-6 py-4 border-b border-white/10 bg-black/20 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto animate-fade-in-up">
-          <h1 className="text-4xl font-bold text-white mb-2 text-glow">
-            Tasks Board
-          </h1>
-          <p className="text-white/60 text-lg">
+          <h1 className="text-2xl font-bold text-white mb-1">Tasks Board</h1>
+          <p className="text-white/60 text-sm">
             Manage your tasks across all projects
           </p>
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="px-6 py-4 bg-black/40 border-b border-white/10 backdrop-blur-md sticky top-0 z-30">
+      {/* Toolbar - Compact */}
+      <div className="px-6 py-3 bg-black/40 border-b border-white/10 backdrop-blur-md sticky top-0 z-30">
         <div
           className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in-up"
           style={{ animationDelay: "0.1s" }}
@@ -95,36 +94,19 @@ export default function TasksPage() {
               </svg>
             </div>
 
-            <select
+            <PrioritySelect
               value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="h-10 px-4 rounded-md bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent transition-all duration-200 hover:bg-white/10 cursor-pointer"
-            >
-              <option value="all" className="bg-black text-white">
-                All Priorities
-              </option>
-              <option value="low" className="bg-black text-white">
-                🔵 Low
-              </option>
-              <option value="medium" className="bg-black text-white">
-                🟡 Medium
-              </option>
-              <option value="high" className="bg-black text-white">
-                🔴 High
-              </option>
-              <option value="urgent" className="bg-black text-white">
-                🚨 Urgent
-              </option>
-            </select>
+              onChange={setPriorityFilter}
+            />
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-white/40 text-sm font-medium">
+          <div className="flex items-center gap-3">
+            <div className="text-white/40 text-xs font-medium">
               {totalTasks} {totalTasks === 1 ? "task" : "tasks"}
             </div>
 
-            <Button className="shadow-[0_0_15px_rgba(124,58,237,0.3)] hover:shadow-[0_0_25px_rgba(124,58,237,0.5)]">
-              <span className="mr-2 text-lg">➕</span> New Task
+            <Button className="h-10 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50">
+              <span className="mr-1.5 text-base">➕</span> New Task
             </Button>
           </div>
         </div>
@@ -153,20 +135,15 @@ export default function TasksPage() {
           <div className="h-full min-w-max">
             {totalTasks === 0 ? (
               <div className="h-full flex items-center justify-center">
-                <div className="text-center glass-panel p-12 rounded-3xl border-dashed border-white/20">
-                  <div className="text-7xl mb-6 filter drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
-                    📋
-                  </div>
-                  <h2 className="text-2xl font-bold text-white mb-2">
+                <div className="text-center glass-panel p-12 rounded-2xl border-dashed border-white/20">
+                  <div className="text-6xl mb-4 animate-float-slow">📋</div>
+                  <h2 className="text-xl font-bold text-white mb-2">
                     No tasks yet
                   </h2>
-                  <p className="text-white/60 mb-8">
+                  <p className="text-white/60 text-sm mb-6">
                     Create your first task to start organizing your work
                   </p>
-                  <Button
-                    size="lg"
-                    className="shadow-[0_0_20px_rgba(124,58,237,0.3)]"
-                  >
+                  <Button className="h-10 shadow-lg shadow-purple-500/30">
                     Create Your First Task
                   </Button>
                 </div>
@@ -188,36 +165,36 @@ export default function TasksPage() {
         )}
       </div>
 
-      {/* Task Detail Modal */}
+      {/* Task Detail Modal - Compact */}
       {selectedTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-fade-in"
             onClick={() => setSelectedTask(null)}
           />
-          <Card className="relative z-10 w-full max-w-2xl p-8 bg-black/90 border-white/20 shadow-[0_0_50px_rgba(124,58,237,0.2)] animate-fade-in-up max-h-[90vh] overflow-y-auto">
-            <div className="flex items-start justify-between mb-6">
+          <Card className="relative z-10 w-full max-w-2xl p-6 bg-black/90 border-white/20 shadow-2xl shadow-purple-500/20 animate-scale-in max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-2xl font-bold text-white text-glow">
+                <div className="flex items-center gap-2 mb-2">
+                  <h2 className="text-xl font-bold text-white">
                     {selectedTask.title}
                   </h2>
-                  <span className="px-2 py-1 rounded-md bg-primary/20 border border-primary/30 text-primary text-xs font-mono">
+                  <span className="px-2 py-0.5 rounded bg-primary/20 border border-primary/30 text-primary text-xs font-mono">
                     #{selectedTask.id}
                   </span>
                 </div>
                 {selectedTask.description && (
-                  <p className="text-white/60 leading-relaxed">
+                  <p className="text-white/60 text-sm leading-relaxed">
                     {selectedTask.description}
                   </p>
                 )}
               </div>
               <button
                 onClick={() => setSelectedTask(null)}
-                className="p-2 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white"
+                className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white"
               >
                 <svg
-                  className="w-6 h-6"
+                  className="w-5 h-5"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -232,12 +209,12 @@ export default function TasksPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-6 mb-8 p-6 rounded-xl bg-white/5 border border-white/10">
+            <div className="grid grid-cols-2 gap-4 mb-6 p-4 rounded-lg bg-white/5 border border-white/10">
               <div>
                 <label className="text-xs uppercase tracking-wider text-white/40 font-semibold mb-1 block">
                   Status
                 </label>
-                <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 text-white text-sm capitalize border border-white/10">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-white/10 text-white text-xs capitalize border border-white/10">
                   {selectedTask.status.replace("_", " ")}
                 </span>
               </div>
@@ -245,7 +222,7 @@ export default function TasksPage() {
                 <label className="text-xs uppercase tracking-wider text-white/40 font-semibold mb-1 block">
                   Priority
                 </label>
-                <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 text-white text-sm capitalize border border-white/10">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-white/10 text-white text-xs capitalize border border-white/10">
                   {selectedTask.priority}
                 </span>
               </div>
@@ -254,18 +231,21 @@ export default function TasksPage() {
                   <label className="text-xs uppercase tracking-wider text-white/40 font-semibold mb-1 block">
                     Due Date
                   </label>
-                  <span className="text-white font-mono">
+                  <span className="text-white text-sm font-mono">
                     {new Date(selectedTask.due_date).toLocaleDateString()}
                   </span>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center gap-4 pt-6 border-t border-white/10">
-              <Button variant="outline" className="flex-1">
+            <div className="flex items-center gap-3 pt-4 border-t border-white/10">
+              <Button variant="outline" className="flex-1 h-10">
                 Edit Task
               </Button>
-              <Button onClick={() => setSelectedTask(null)} className="flex-1">
+              <Button
+                onClick={() => setSelectedTask(null)}
+                className="flex-1 h-10"
+              >
                 Close
               </Button>
             </div>

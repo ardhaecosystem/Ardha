@@ -73,29 +73,29 @@ export default function LoginPage() {
         style={{ animationDelay: "2s" }}
       />
 
-      <Card className="relative z-10 w-full max-w-md p-8 border-white/10 bg-black/40 backdrop-blur-xl shadow-[0_0_50px_rgba(124,58,237,0.2)]">
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-[0_0_20px_rgba(124,58,237,0.5)]">
-            <span className="text-white font-bold text-2xl">A</span>
+      <Card className="relative z-10 w-full max-w-md p-6 border-white/10 bg-black/40 backdrop-blur-xl shadow-[0_0_50px_rgba(124,58,237,0.2)]">
+        <div className="text-center mb-5">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-[0_0_20px_rgba(124,58,237,0.5)]">
+            <span className="text-white font-bold text-xl">A</span>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2 text-glow">
+          <h1 className="text-2xl font-bold text-white mb-1.5 text-glow">
             Welcome Back
           </h1>
-          <p className="text-white/60">
+          <p className="text-white/60 text-sm">
             Sign in to continue building the future
           </p>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 backdrop-blur-sm animate-fade-in">
+          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 backdrop-blur-sm animate-fade-in">
             <p className="text-red-400 text-sm text-center font-medium">
               {error}
             </p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-2">
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium text-white/80 ml-1">
               Email
             </label>
@@ -112,7 +112,7 @@ export default function LoginPage() {
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex justify-between items-center ml-1">
               <label className="text-sm font-medium text-white/80">
                 Password
@@ -157,7 +157,7 @@ export default function LoginPage() {
           <Button
             type="submit"
             disabled={isLoading}
-            className="w-full h-12 text-base font-semibold shadow-[0_0_20px_rgba(124,58,237,0.3)] hover:shadow-[0_0_30px_rgba(124,58,237,0.5)] transition-all duration-300"
+            className="w-full h-11 text-sm font-semibold shadow-[0_0_20px_rgba(124,58,237,0.3)] hover:shadow-[0_0_30px_rgba(124,58,237,0.5)] transition-all duration-300 mt-4"
           >
             {isLoading ? (
               <div className="flex items-center gap-2">
@@ -169,7 +169,7 @@ export default function LoginPage() {
             )}
           </Button>
 
-          <div className="relative my-8">
+          <div className="relative my-5">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-white/10"></div>
             </div>
@@ -180,13 +180,13 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={loginWithGitHub}
               disabled={isLoading}
-              className="bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white h-11"
+              className="bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white h-10 text-sm"
             >
               <svg
                 className="w-5 h-5 mr-2"
@@ -206,7 +206,7 @@ export default function LoginPage() {
               variant="outline"
               onClick={loginWithGoogle}
               disabled={isLoading}
-              className="bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white h-11"
+              className="bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white h-10 text-sm"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
@@ -231,7 +231,7 @@ export default function LoginPage() {
           </div>
         </form>
 
-        <div className="mt-8 text-center">
+        <div className="mt-5 text-center">
           <p className="text-white/60 text-sm">
             Don't have an account?{" "}
             <Link

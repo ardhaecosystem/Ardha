@@ -11,6 +11,11 @@ export function ChatMessage({ message }: MessageProps) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
 
+  // Don't render system messages
+  if (message.role === "system") {
+    return null;
+  }
+
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
     setCopied(true);
@@ -23,21 +28,21 @@ export function ChatMessage({ message }: MessageProps) {
 
   return (
     <div
-      className={`flex gap-4 ${isUser ? "flex-row-reverse" : "flex-row"} group`}
+      className={`flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"} group animate-in fade-in slide-in-from-bottom-2 duration-300`}
     >
-      {/* Avatar */}
+      {/* Avatar - More compact */}
       <div
-        className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
           isUser
             ? "bg-gradient-to-br from-purple-500 to-pink-500"
-            : "glass-panel border-2 border-[hsl(var(--neon-blue))]"
+            : "glass-panel border border-[hsl(var(--neon-blue))]/50"
         }`}
       >
         {isUser ? (
-          <span className="text-white font-bold text-sm">U</span>
+          <span className="text-white font-semibold text-xs">U</span>
         ) : (
           <svg
-            className="w-6 h-6 text-[hsl(var(--neon-blue))]"
+            className="w-4 h-4 text-[hsl(var(--neon-blue))]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -52,26 +57,26 @@ export function ChatMessage({ message }: MessageProps) {
         )}
       </div>
 
-      {/* Message Content */}
+      {/* Message Content - More compact */}
       <div
         className={`flex-1 max-w-3xl ${isUser ? "text-right" : "text-left"}`}
       >
         <div
-          className={`inline-block p-4 rounded-2xl glass-panel relative group/message transition-all duration-300 ${
+          className={`inline-block px-4 py-2.5 rounded-xl glass-panel relative group/message transition-all duration-300 ${
             isUser
               ? "bg-gradient-to-br from-purple-500/20 to-pink-500/20 border-purple-500/30 hover:border-purple-500/50"
               : "border-[hsl(var(--neon-blue))]/30 hover:border-[hsl(var(--neon-blue))]/50"
           }`}
         >
-          {/* Copy Button */}
+          {/* Copy Button - Smaller */}
           <button
             onClick={handleCopy}
-            className="absolute top-2 right-2 opacity-0 group-hover/message:opacity-100 transition-opacity duration-200 p-2 rounded-lg hover:bg-white/10 z-10"
+            className="absolute top-2 right-2 opacity-0 group-hover/message:opacity-100 transition-opacity duration-200 p-1.5 rounded-lg hover:bg-white/10 z-10"
             aria-label="Copy message"
           >
             {copied ? (
               <svg
-                className="w-4 h-4 text-green-400"
+                className="w-3.5 h-3.5 text-green-400"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -85,7 +90,7 @@ export function ChatMessage({ message }: MessageProps) {
               </svg>
             ) : (
               <svg
-                className="w-4 h-4 text-white/60 hover:text-white"
+                className="w-3.5 h-3.5 text-white/60 hover:text-white"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -100,14 +105,19 @@ export function ChatMessage({ message }: MessageProps) {
             )}
           </button>
 
-          {/* Message Text */}
+          {/* Message Text - Smaller font */}
           <div className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap pr-8">
             {message.content}
           </div>
 
-          {/* Metadata */}
-          <div className="flex items-center gap-3 mt-3 text-white/40 text-xs">
-            <span>{new Date(message.created_at).toLocaleTimeString()}</span>
+          {/* Metadata - Smaller */}
+          <div className="flex items-center gap-2 mt-1.5 text-white/40 text-xs">
+            <span>
+              {new Date(message.created_at).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
             {message.ai_model && (
               <>
                 <span>•</span>

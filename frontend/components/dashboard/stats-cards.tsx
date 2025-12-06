@@ -35,27 +35,31 @@ export function StatsCards() {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {stats.map((stat) => (
-        <div key={stat.label} className="relative group">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {stats.map((stat, index) => (
+        <div
+          key={stat.label}
+          className="relative group animate-in fade-in slide-in-from-bottom-2"
+          style={{ animationDelay: `${index * 0.1}s` }}
+        >
           {/* Glow Effect */}
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-          {/* Card */}
-          <div className="relative backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300">
-            <div className="text-3xl mb-2">{stat.icon}</div>
+          {/* Card - Compact */}
+          <div className="relative glass-panel rounded-xl border border-white/10 p-4 hover:bg-white/10 transition-all duration-300">
+            <div className="text-2xl mb-2">{stat.icon}</div>
 
             {stat.loading ? (
-              <div className="h-10 flex items-center">
-                <div className="w-12 h-8 bg-white/10 rounded animate-pulse"></div>
+              <div className="h-8 flex items-center">
+                <div className="w-10 h-6 bg-white/10 rounded animate-pulse"></div>
               </div>
             ) : (
-              <div className="text-3xl font-bold text-white mb-1">
+              <div className="text-2xl font-bold text-white mb-0.5">
                 {stat.value}
               </div>
             )}
 
-            <div className="text-white/60 text-sm">{stat.label}</div>
+            <div className="text-white/60 text-xs">{stat.label}</div>
           </div>
         </div>
       ))}

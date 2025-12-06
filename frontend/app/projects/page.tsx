@@ -24,21 +24,19 @@ export default function ProjectsPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      {/* Header */}
+      {/* Header - Compact */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in-up">
         <div>
-          <h1 className="text-4xl font-bold text-white mb-2 text-glow">
-            Projects
-          </h1>
-          <p className="text-white/60 text-lg">
+          <h1 className="text-3xl font-bold text-white mb-1">Projects</h1>
+          <p className="text-white/60 text-sm">
             Manage your AI-powered projects and workflows
           </p>
         </div>
         <Button
           onClick={() => setShowCreateModal(true)}
-          className="shadow-[0_0_20px_rgba(124,58,237,0.3)] hover:shadow-[0_0_30px_rgba(124,58,237,0.5)] transition-all duration-300"
+          className="h-10 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-200"
         >
-          <span className="mr-2 text-xl">➕</span> New Project
+          <span className="mr-1.5 text-base">➕</span> New Project
         </Button>
       </div>
 
@@ -70,17 +68,17 @@ export default function ProjectsPage() {
           </svg>
         </div>
 
-        <div className="flex items-center gap-2 bg-white/5 p-1 rounded-lg border border-white/10">
+        <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg border border-white/10">
           <button
             onClick={() => setViewMode("grid")}
-            className={`p-2 rounded-md transition-all duration-200 ${
+            className={`p-1.5 rounded-md transition-all duration-200 ${
               viewMode === "grid"
-                ? "bg-primary/20 text-primary shadow-[0_0_10px_rgba(124,58,237,0.2)]"
+                ? "bg-primary/20 text-primary shadow-sm shadow-purple-500/30"
                 : "text-white/60 hover:text-white hover:bg-white/10"
             }`}
           >
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -95,14 +93,14 @@ export default function ProjectsPage() {
           </button>
           <button
             onClick={() => setViewMode("list")}
-            className={`p-2 rounded-md transition-all duration-200 ${
+            className={`p-1.5 rounded-md transition-all duration-200 ${
               viewMode === "list"
-                ? "bg-primary/20 text-primary shadow-[0_0_10px_rgba(124,58,237,0.2)]"
+                ? "bg-primary/20 text-primary shadow-sm shadow-purple-500/30"
                 : "text-white/60 hover:text-white hover:bg-white/10"
             }`}
           >
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -132,14 +130,12 @@ export default function ProjectsPage() {
             ))}
           </div>
         ) : filteredProjects.length === 0 ? (
-          <div className="text-center py-20 glass-panel rounded-3xl border-dashed border-white/20">
-            <div className="text-7xl mb-6 filter drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
-              📁
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">
+          <div className="text-center py-16 glass-panel rounded-2xl border-dashed border-white/20">
+            <div className="text-6xl mb-4 animate-float-slow">📁</div>
+            <h2 className="text-xl font-bold text-white mb-2">
               {searchQuery ? "No projects found" : "No projects yet"}
             </h2>
-            <p className="text-white/60 mb-8 max-w-md mx-auto">
+            <p className="text-white/60 text-sm mb-6 max-w-md mx-auto">
               {searchQuery
                 ? "Try adjusting your search query"
                 : "Create your first project to start building with AI"}
@@ -147,8 +143,7 @@ export default function ProjectsPage() {
             {!searchQuery && (
               <Button
                 onClick={() => setShowCreateModal(true)}
-                size="lg"
-                className="shadow-[0_0_20px_rgba(124,58,237,0.3)]"
+                className="h-10 shadow-lg shadow-purple-500/30"
               >
                 Create Your First Project
               </Button>
@@ -236,28 +231,28 @@ export default function ProjectsPage() {
                 href={`/projects/${project.slug}`}
                 className="block group"
               >
-                <div className="glass-panel rounded-xl p-4 hover:bg-white/5 hover:border-primary/30 transition-all duration-200 flex items-center gap-6">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center text-xl border border-primary/20">
+                <div className="glass-panel rounded-lg p-3 hover:bg-white/5 hover:border-primary/30 transition-all duration-200 flex items-center gap-4">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center text-lg border border-primary/20">
                     🚀
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors truncate">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <h3 className="text-base font-semibold text-white group-hover:text-primary transition-colors truncate">
                         {project.name}
                       </h3>
                       {project.is_private && (
-                        <span className="px-2 py-0.5 rounded bg-black/40 border border-white/10 text-white/50 text-[10px] font-medium">
+                        <span className="px-1.5 py-0.5 rounded bg-black/40 border border-white/10 text-white/50 text-xs font-medium">
                           PRIVATE
                         </span>
                       )}
                     </div>
-                    <p className="text-white/50 text-sm truncate">
+                    <p className="text-white/50 text-xs truncate">
                       {project.description || "No description"}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-8 text-sm text-white/40">
+                  <div className="flex items-center gap-6 text-xs text-white/40">
                     <div className="flex items-center gap-2">
                       <svg
                         className="w-4 h-4"
@@ -301,18 +296,18 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      {/* Create Project Modal */}
+      {/* Create Project Modal - Compact */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-fade-in"
             onClick={() => setShowCreateModal(false)}
           />
-          <Card className="relative z-10 w-full max-w-lg p-8 bg-black/90 border-white/20 shadow-[0_0_50px_rgba(124,58,237,0.2)] animate-fade-in-up">
-            <h2 className="text-2xl font-bold text-white mb-4 text-glow">
+          <Card className="relative z-10 w-full max-w-lg p-6 bg-black/90 border-white/20 shadow-2xl shadow-purple-500/20 animate-scale-in">
+            <h2 className="text-xl font-bold text-white mb-3">
               Create New Project
             </h2>
-            <p className="text-white/60 mb-8">
+            <p className="text-white/60 text-sm mb-6">
               Project creation form coming in next update. For now, create
               projects via API.
             </p>
@@ -320,6 +315,7 @@ export default function ProjectsPage() {
               <Button
                 onClick={() => setShowCreateModal(false)}
                 variant="outline"
+                className="h-10"
               >
                 Close
               </Button>
